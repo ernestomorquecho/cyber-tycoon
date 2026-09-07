@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://diltugl6nvpk2"]
 
-[node name="Inventario" type="Control" unique_id=579973021]
+[node name="Inventario" type="Control" unique_id=1251908268]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
