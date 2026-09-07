@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://cv31xtpsdf4xc"]
 
-[ext_resource type="Script" uid="uid://wgv5eo8je2o6" path="res://TarjetaProducto.gd" id="1_edyoo"]
+[ext_resource type="Script" uid="uid://wgv5eo8je2o6" path="res://Scripts/TarjetaProducto.gd" id="1_edyoo"]
 
 [node name="TarjetaProducto" type="PanelContainer" unique_id=717992532]
 custom_minimum_size = Vector2(0, 96)

@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://ddlvoolmb0vkp"]
 
-[ext_resource type="Script" uid="uid://b2spc63jmyxmr" path="res://Escenas/catalogo.gd" id="1_5mqxo"]
+[ext_resource type="Script" uid="uid://b2spc63jmyxmr" path="res://Scripts/catalogo.gd" id="1_5mqxo"]
 
 [node name="Catalogo" type="Control" unique_id=1548247268 node_paths=PackedStringArray("dinero_label", "rack_label", "mensaje_label", "lista_productos", "boton_cerrar", "boton_cancelar")]
 layout_mode = 3
