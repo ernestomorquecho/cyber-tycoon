@@ -1,0 +1,68 @@
+[gd_scene format=3 uid="uid://cv31xtpsdf4xc"]
+
+[ext_resource type="Script" uid="uid://wgv5eo8je2o6" path="res://TarjetaProducto.gd" id="1_edyoo"]
+
+[node name="TarjetaProducto" type="PanelContainer" unique_id=717992532]
+custom_minimum_size = Vector2(0, 96)
+size_flags_horizontal = 3
+size_flags_vertical = 0
+script = ExtResource("1_edyoo")
+
+[node name="Margin" type="MarginContainer" parent="." unique_id=80396342]
+layout_mode = 2
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 10
+
+[node name="HBox" type="HBoxContainer" parent="Margin" unique_id=1005301524]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="Imagen" type="TextureRect" parent="Margin/HBox" unique_id=925196896]
+custom_minimum_size = Vector2(64, 64)
+layout_mode = 2
+size_flags_vertical = 4
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Info" type="VBoxContainer" parent="Margin/HBox" unique_id=1557530347]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 2
+
+[node name="Nombre" type="Label" parent="Margin/HBox/Info" unique_id=1820521636]
+layout_mode = 2
+theme_override_font_sizes/font_size = 15
+text = "Nombre del producto"
+
+[node name="FilaSuperior" type="HBoxContainer" parent="Margin/HBox/Info" unique_id=372003960]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Precio" type="Label" parent="Margin/HBox/Info/FilaSuperior" unique_id=1305970415]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 18
+text = "$ 0"
+
+[node name="BotonComprar" type="Button" parent="Margin/HBox/Info/FilaSuperior" unique_id=1119793615]
+layout_mode = 2
+text = "COMPRAR"
+
+[node name="Categoria" type="Label" parent="Margin/HBox/Info" unique_id=437851812]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.55, 0.6, 0.68, 1)
+theme_override_font_sizes/font_size = 12
+text = "Categoría"
+
+[node name="Detalle" type="Label" parent="Margin/HBox/Info" unique_id=586711583]
+layout_mode = 2
+theme_override_font_sizes/font_size = 13
+text = "⚡ 0W   ▤ 0U"
+
+[node name="Advertencia" type="Label" parent="Margin/HBox/Info" unique_id=140944268]
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.35, 0.35, 1)
+theme_override_font_sizes/font_size = 12

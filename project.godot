@@ -14,12 +14,17 @@ config/name="CyberTycoon"
 run/main_scene="uid://dmt6f4hcduxau"
 config/features=PackedStringArray("4.6", "Mobile")
 
+[autoload]
+
+GameData="*uid://d1rk2thf5tuul"
+
 [display]
 
-window/size/viewport_width=1280
-window/size/viewport_height=720
+window/size/viewport_width=720
+window/size/viewport_height=1280
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
+window/handheld/orientation=1
 
 [physics]
 
