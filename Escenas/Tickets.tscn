@@ -1,5 +1,7 @@
 [gd_scene format=3 uid="uid://g530x14k7pgf"]
 
+[ext_resource type="Script" uid="uid://2odljwj5dmke" path="res://Scripts/Helpdesk.gd" id="1"]
+
 [node name="Tickets" type="Control" unique_id=470108782]
 layout_mode = 3
 anchors_preset = 15
@@ -7,3 +9,63 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+script = ExtResource("1")
+
+[node name="Background" type="ColorRect" parent="." unique_id=1280900078]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.61203617, 0.6120362, 0.6120373, 1)
+
+[node name="Main" type="VBoxContainer" parent="." unique_id=1447338781]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 8
+
+[node name="TabsRow" type="HBoxContainer" parent="Main" unique_id=1153648989]
+layout_mode = 2
+
+[node name="PorHacerButton" type="Button" parent="Main/TabsRow" unique_id=1027748936]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "POR HACER"
+
+[node name="NotificacionesButton" type="Button" parent="Main/TabsRow" unique_id=1367047171]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "NOTIFICACIONES"
+
+[node name="CompletadosButton" type="Button" parent="Main/TabsRow" unique_id=367954227]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "COMPLETADOS"
+
+[node name="TitleLabel" type="Label" parent="Main" unique_id=501150408]
+layout_mode = 2
+theme_override_font_sizes/font_size = 32
+text = "TICKETS"
+horizontal_alignment = 1
+
+[node name="ScrollContainer" type="ScrollContainer" parent="Main" unique_id=701243396]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="TicketList" type="VBoxContainer" parent="Main/ScrollContainer" unique_id=310121089]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 12
+
+[node name="CloseButton" type="Button" parent="Main" unique_id=591550247]
+unique_name_in_owner = true
+layout_mode = 2
+text = "CERRAR"
+
+[node name="FetchRequest" type="HTTPRequest" parent="." unique_id=1041681177]
