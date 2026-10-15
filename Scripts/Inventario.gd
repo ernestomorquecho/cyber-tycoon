@@ -12,26 +12,63 @@ const ItemCardScene: PackedScene = preload("res://Escenas/Inventario/InventoryIt
 @onready var _grid_enfriamiento: GridContainer = %Enfriamiento
 @onready var _grid_red: GridContainer = %Red
 
-# Espejo local de las métricas del jugador SOLO para mostrarlas en el header.
-# El valor real siempre vive en la tabla Usuarios del backend.
-var _capacidad_watts: int = 0
+# Métricas del jugador para el header
+var _capacidad_watts: int = 1000
 var _carga_electrica_actual: int = 0
-var _temperatura_cd: int = 0
+var _temperatura_cd: int = 25
 
 
 func _ready() -> void:
-	_close_button.pressed.connect(_on_close_pressed)
-	# TODO: aquí en el futuro se hace GET /api/jugador/estado, se leen
-	# usuario.capacidad_watts / usuario.carga_electrica_actual / usuario.temperaturaCD
-	# para el header, y por cada fila de "inventario" se arma un
-	# InventoryItemData y se llama _spawn_item(data).
-	_load_mock_data_for_testing()
+
+	# Nos conectamos a las señales del inventario real en GameData
+	GameData.inventario_recibido.connect(_on_inventario_recibido)
+	GameData.inventario_error.connect(_on_inventario_error)
+
+	# Limpiamos los grids por si acaso y pedimos el inventario al servidor
+	_limpiar_grids()
+	GameData.solicitar_inventario()
 	_refresh_header()
 
 
-func _on_close_pressed() -> void:
-	# TODO: normalmente esto oculta el modal y regresa al Dashboard de fondo.
-	print("[Inventario] Cerrar presionado (falta conectar con el Dashboard)")
+func _on_close_button_pressed() -> void:
+	get_tree().change_scene_to_file("res://Escenas/Dashboard.tscn")
+
+
+func _limpiar_grids() -> void:
+	for child in _grid_servidores.get_children():
+		child.queue_free()
+	for child in _grid_enfriamiento.get_children():
+		child.queue_free()
+	for child in _grid_red.get_children():
+		child.queue_free()
+
+
+func _on_inventario_recibido(items: Array) -> void:
+	_limpiar_grids()
+	
+	for item_dict in items:
+		var data = InventoryItemData.new()
+		# Mapeamos los campos que vienen del backend (join entre inventario y catalogo)
+		data.id_inventario = int(item_dict.get("id_inventario", 0))
+		data.nombre_producto = String(item_dict.get("nombreProducto", "Hardware"))
+		data.categoria = String(item_dict.get("categoria", "Servidor"))
+		data.aumento_teraflops = int(item_dict.get("aumento_teraflops", 0))
+		data.impacto_temperatura = int(item_dict.get("impacto_temperatura", 0))
+		data.consumo_electrico = int(item_dict.get("consumoElectrico", 0))
+		data.activo = bool(item_dict.get("activo", true))
+		
+		_spawn_item(data)
+		
+		# Sumamos consumo eléctrico inicial para las métricas del header
+		if data.activo:
+			_carga_electrica_actual += data.consumo_electrico
+			_temperatura_cd += data.impacto_temperatura
+
+	_refresh_header()
+
+
+func _on_inventario_error(mensaje: String) -> void:
+	print("[Inventario] Error al cargar: ", mensaje)
 
 
 func _spawn_item(data: InventoryItemData) -> void:
@@ -47,7 +84,7 @@ func _grid_for_category(categoria: String) -> GridContainer:
 		return _grid_enfriamiento
 	if normalized.begins_with("red") or normalized.begins_with("network"):
 		return _grid_red
-	return _grid_servidores # "Servidor" / cualquier categoría no reconocida
+	return _grid_servidores
 
 
 func _on_item_toggled_confirmed(_id_inventario: int, _activo: bool, delta_temp: int, delta_watts: int) -> void:
@@ -57,43 +94,7 @@ func _on_item_toggled_confirmed(_id_inventario: int, _activo: bool, delta_temp: 
 
 
 func _refresh_header() -> void:
-	_watts_label.text = "Consumo: %d / %d W" % [_carga_electrica_actual, _capacidad_watts]
-	_temp_label.text = "Temperatura: %d°C" % _temperatura_cd
-
-
-# --- Solo para probar el flujo mientras no hay conexión real a /api/jugador/estado ---
-
-func _load_mock_data_for_testing() -> void:
-	_capacidad_watts = 1000
-	_carga_electrica_actual = 650
-	_temperatura_cd = 42
-
-	var servidor := InventoryItemData.new()
-	servidor.id_inventario = 1
-	servidor.nombre_producto = "Servidor Rack R710"
-	servidor.categoria = "Servidor"
-	servidor.aumento_teraflops = 100
-	servidor.impacto_temperatura = 8
-	servidor.consumo_electrico = 250
-	servidor.activo = true
-	_spawn_item(servidor)
-
-	var enfriador := InventoryItemData.new()
-	enfriador.id_inventario = 2
-	enfriador.nombre_producto = "Unidad CRAC"
-	enfriador.categoria = "Enfriamiento"
-	enfriador.aumento_teraflops = 0
-	enfriador.impacto_temperatura = -15
-	enfriador.consumo_electrico = 180
-	enfriador.activo = true
-	_spawn_item(enfriador)
-
-	var router := InventoryItemData.new()
-	router.id_inventario = 3
-	router.nombre_producto = "Router Core 10G"
-	router.categoria = "Red"
-	router.aumento_teraflops = 0
-	router.impacto_temperatura = 3
-	router.consumo_electrico = 60
-	router.activo = false
-	_spawn_item(router)
+	if _watts_label:
+		_watts_label.text = "Consumo: %d / %d W" % [_carga_electrica_actual, _capacidad_watts]
+	if _temp_label:
+		_temp_label.text = "Temperatura: %d°C" % _temperatura_cd

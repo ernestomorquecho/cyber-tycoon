@@ -150,3 +150,7 @@ func _spawn_mock_tickets_for_testing() -> void:
 	nomina.decision_time_seconds = 25.0
 	nomina.tiempo_para_completado = 30
 	_spawn_ticket(nomina)
+
+
+func _on_close_button_pressed() -> void:
+	get_tree().change_scene_to_file("res://Escenas/Dashboard.tscn")

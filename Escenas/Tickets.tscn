@@ -69,3 +69,5 @@ layout_mode = 2
 text = "CERRAR"
 
 [node name="FetchRequest" type="HTTPRequest" parent="." unique_id=1041681177]
+
+[connection signal="pressed" from="Main/CloseButton" to="." method="_on_close_button_pressed"]
