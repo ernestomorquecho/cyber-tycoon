@@ -1,92 +1,220 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene format=3]
 
-[ext_resource type="Script" path="res://Scripts/TicketCard.gd" id="1"]
+[ext_resource type="Script" uid="uid://dln4ktlqw331e" path="res://Scripts/TicketCard.gd" id="1"]
+[ext_resource type="Texture2D" path="res://Assets/Tickets/ticketSoli.png" id="2"]
+[ext_resource type="Texture2D" path="res://Assets/Tickets/ticketConte.png" id="3"]
+[ext_resource type="Texture2D" path="res://Assets/Tickets/aceptarBut.png" id="4"]
+[ext_resource type="Texture2D" path="res://Assets/Tickets/aceptarBut_pressed.png" id="5"]
+[ext_resource type="Texture2D" path="res://Assets/Tickets/aceptarBut_hover.png" id="6"]
+[ext_resource type="Texture2D" path="res://Assets/Tickets/aceptarBut_disabled.png" id="7"]
+[ext_resource type="Texture2D" path="res://Assets/Tickets/rechazarBut.png" id="8"]
+[ext_resource type="Texture2D" path="res://Assets/Tickets/rechazarBut_pressed.png" id="9"]
+[ext_resource type="Texture2D" path="res://Assets/Tickets/rechazarBut_hover.png" id="10"]
+[ext_resource type="Texture2D" path="res://Assets/Tickets/rechazarBut_disabled.png" id="11"]
 
-[node name="TicketCard" type="PanelContainer"]
-custom_minimum_size = Vector2(0, 60)
+[node name="TicketCard" type="Control"]
+custom_minimum_size = Vector2(0, 130)
 layout_mode = 2
 script = ExtResource("1")
 
-[node name="Margin" type="MarginContainer" parent="."]
-layout_mode = 2
-theme_override_constants/margin_left = 10
-theme_override_constants/margin_top = 8
-theme_override_constants/margin_right = 10
-theme_override_constants/margin_bottom = 8
-
-[node name="VBox" type="VBoxContainer" parent="Margin"]
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="HeaderButton" type="Button" parent="Margin/VBox"]
+[node name="Collapsed" type="NinePatchRect" parent="."]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(0, 44)
-layout_mode = 2
-flat = true
-
-[node name="HeaderRow" type="HBoxContainer" parent="Margin/VBox/HeaderButton"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-mouse_filter = 2
-theme_override_constants/separation = 10
+texture = ExtResource("2")
+patch_margin_left = 101
+patch_margin_top = 12
+patch_margin_right = 12
+patch_margin_bottom = 12
 
-[node name="ClientIcon" type="TextureRect" parent="Margin/VBox/HeaderButton/HeaderRow"]
+[node name="CollapsedTitle" type="Label" parent="Collapsed"]
 unique_name_in_owner = true
-custom_minimum_size = Vector2(32, 32)
-layout_mode = 2
-
-[node name="TitleLabel" type="Label" parent="Margin/VBox/HeaderButton/HeaderRow"]
-unique_name_in_owner = true
-layout_mode = 2
-size_flags_horizontal = 3
-vertical_alignment = 1
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 112.0
+offset_right = -160.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.89, 0.93, 0.97, 1)
+theme_override_font_sizes/font_size = 26
 text = "Título del ticket"
-
-[node name="DecisionTimeLabel" type="Label" parent="Margin/VBox/HeaderButton/HeaderRow"]
-unique_name_in_owner = true
-layout_mode = 2
 vertical_alignment = 1
+text_overrun_behavior = 3
+
+[node name="CollapsedTime" type="Label" parent="Collapsed"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -150.0
+offset_right = -16.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.89, 0.93, 0.97, 1)
+theme_override_font_sizes/font_size = 22
 text = "00:00"
+horizontal_alignment = 2
+vertical_alignment = 1
 
-[node name="ExpandedContent" type="VBoxContainer" parent="Margin/VBox"]
+[node name="CollapsedToggle" type="TextureButton" parent="Collapsed"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+focus_mode = 0
+
+[node name="Expanded" type="NinePatchRect" parent="."]
 unique_name_in_owner = true
 visible = false
-layout_mode = 2
-theme_override_constants/separation = 6
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("3")
+patch_margin_left = 211
+patch_margin_top = 12
+patch_margin_right = 93
+patch_margin_bottom = 12
 
-[node name="DescriptionLabel" type="Label" parent="Margin/VBox/ExpandedContent"]
+[node name="Avatar" type="TextureRect" parent="Expanded"]
 unique_name_in_owner = true
-layout_mode = 2
+texture_filter = 1
+layout_mode = 1
+offset_left = 13.0
+offset_top = 13.0
+offset_right = 114.0
+offset_bottom = 114.0
+expand_mode = 1
+stretch_mode = 5
+
+[node name="ExpandedTitle" type="Label" parent="Expanded"]
+unique_name_in_owner = true
+layout_mode = 1
+anchor_right = 1.0
+offset_left = 122.0
+offset_top = 9.0
+offset_right = -100.0
+offset_bottom = 59.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(0.89, 0.93, 0.97, 1)
+theme_override_font_sizes/font_size = 24
+text = "Título del ticket"
+vertical_alignment = 1
+text_overrun_behavior = 3
+
+[node name="ExpandedTime" type="Label" parent="Expanded"]
+unique_name_in_owner = true
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -88.0
+offset_top = 9.0
+offset_right = -10.0
+offset_bottom = 59.0
+grow_horizontal = 0
+theme_override_colors/font_color = Color(0.89, 0.93, 0.97, 1)
+theme_override_font_sizes/font_size = 22
+text = "00:00"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="DescriptionLabel" type="Label" parent="Expanded"]
+unique_name_in_owner = true
+layout_mode = 1
+anchor_right = 1.0
+offset_left = 122.0
+offset_top = 66.0
+offset_right = -14.0
+offset_bottom = 182.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(0.78, 0.82, 0.88, 1)
+theme_override_font_sizes/font_size = 17
 text = "Descripción del ticket..."
+autowrap_mode = 3
 
-[node name="RequirementsLabel" type="Label" parent="Margin/VBox/ExpandedContent"]
+[node name="RequirementsLabel" type="Label" parent="Expanded"]
 unique_name_in_owner = true
-layout_mode = 2
-text = "Requiere: 0.0 TF / 0 Mbps / 0 MB"
+layout_mode = 1
+anchor_right = 1.0
+offset_left = 16.0
+offset_top = 190.0
+offset_right = -16.0
+offset_bottom = 228.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(0.55, 0.8, 1, 1)
+theme_override_font_sizes/font_size = 15
+text = "Requiere: ..."
+autowrap_mode = 3
 
-[node name="ProcessTimeLabel" type="Label" parent="Margin/VBox/ExpandedContent"]
+[node name="ProcessLabel" type="Label" parent="Expanded"]
 unique_name_in_owner = true
 visible = false
-layout_mode = 2
+layout_mode = 1
+anchor_right = 1.0
+offset_left = 226.0
+offset_top = 238.0
+offset_right = -16.0
+offset_bottom = 276.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(0.89, 0.93, 0.97, 1)
+theme_override_font_sizes/font_size = 20
 text = "Procesando: 00:00"
+horizontal_alignment = 2
+vertical_alignment = 1
 
-[node name="ButtonsRow" type="HBoxContainer" parent="Margin/VBox/ExpandedContent"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="RejectButton" type="Button" parent="Margin/VBox/ExpandedContent/ButtonsRow"]
+[node name="AcceptButton" type="TextureButton" parent="Expanded"]
 unique_name_in_owner = true
-layout_mode = 2
-text = "RECHAZAR"
+layout_mode = 1
+offset_left = 18.0
+offset_top = 231.0
+offset_right = 110.0
+offset_bottom = 282.0
+focus_mode = 0
+texture_normal = ExtResource("4")
+texture_pressed = ExtResource("5")
+texture_hover = ExtResource("6")
+texture_disabled = ExtResource("7")
+ignore_texture_size = true
+stretch_mode = 5
 
-[node name="AcceptButton" type="Button" parent="Margin/VBox/ExpandedContent/ButtonsRow"]
+[node name="RejectButton" type="TextureButton" parent="Expanded"]
 unique_name_in_owner = true
-layout_mode = 2
-text = "ACEPTAR"
+layout_mode = 1
+offset_left = 117.0
+offset_top = 231.0
+offset_right = 209.0
+offset_bottom = 282.0
+focus_mode = 0
+texture_normal = ExtResource("8")
+texture_pressed = ExtResource("9")
+texture_hover = ExtResource("10")
+texture_disabled = ExtResource("11")
+ignore_texture_size = true
+stretch_mode = 5
+
+[node name="ExpandedToggle" type="TextureButton" parent="Expanded"]
+unique_name_in_owner = true
+layout_mode = 1
+anchor_right = 1.0
+offset_left = 118.0
+offset_top = 4.0
+offset_right = -4.0
+offset_bottom = 62.0
+grow_horizontal = 2
+focus_mode = 0
 
 [node name="DecisionTimer" type="Timer" parent="."]
 one_shot = true

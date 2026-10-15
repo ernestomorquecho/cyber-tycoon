@@ -4,8 +4,13 @@ class_name TicketData
 ## GET /api/tickets/pendientes (ver src/routes/tickets.routes.js del backend).
 
 @export var id_ticket: int = 0
+# La tabla solo trae "descripcion" (en la práctica es el nombre corto del
+# contrato, ej. "Hospedaje Web PYME"). Helpdesk.gd lo usa como título y arma
+# el texto "detalle" con las recompensas/penalizaciones reales del ticket.
 @export var descripcion: String = ""
-@export var icon: Texture2D # la tabla no maneja ícono/cliente todavía, placeholder
+@export var titulo: String = ""
+@export var detalle: String = ""
+@export var icon: Texture2D # avatar del contratante (av2.png / av3.png)
 
 @export var teraflops_requeridos: float = 0.0
 @export var anchoDeBanda_requerido: float = 0.0
@@ -19,5 +24,7 @@ class_name TicketData
 @export var fecha_limite: String = ""       # datetime ISO que regresa MySQL
 @export var tiempo_para_completado: int = 30 # segundos, viene de "tiempoParaCompletado"
 
-
+# Este NO viene de la API: se calcula localmente en Helpdesk.gd restando
+# fecha_limite menos la hora actual, solo para pintar el cronómetro de
+# decisión. El servidor sigue siendo quien de verdad valida los tiempos.
 @export var decision_time_seconds: float = 15.0
