@@ -79,9 +79,9 @@ func setup(data: TicketData) -> void:
 	_e_title.text = title
 	_description_label.text = detail
 	_requirements_label.text = "Requiere:  Teraflops %s   |   Ancho de banda %s   |   Memoria %s" % [
-		String.num(data.teraflops_requeridos),
-		String.num(data.anchoDeBanda_requerido),
-		String.num(data.memoriaRequerida)
+		TicketData.fmt_num(data.teraflops_requeridos),
+		TicketData.fmt_num(data.anchoDeBanda_requerido),
+		TicketData.fmt_num(data.memoriaRequerida)
 	]
 	if data.icon:
 		_avatar.texture = data.icon
@@ -92,6 +92,10 @@ func setup(data: TicketData) -> void:
 
 func get_title() -> String:
 	return _c_title.text
+
+
+func get_data() -> TicketData:
+	return _data
 
 
 func _process(_delta: float) -> void:

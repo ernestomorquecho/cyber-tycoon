@@ -13,18 +13,18 @@ const ItemCardScene: PackedScene = preload("res://Escenas/Inventario/InventoryIt
 @onready var _grid_red: GridContainer = %Red
 
 # Métricas del jugador para el header
+const TEMP_BASE: int = 25
 var _capacidad_watts: int = 1000
 var _carga_electrica_actual: int = 0
-var _temperatura_cd: int = 25
+var _temperatura_cd: int = TEMP_BASE
 
 
 func _ready() -> void:
-
 	# Nos conectamos a las señales del inventario real en GameData
-	GameData.inventario_recibido.connect(_on_inventario_recibido)
-	GameData.inventario_error.connect(_on_inventario_error)
+	if GameData.has_signal("inventario_recibido"):
+		GameData.inventario_recibido.connect(_on_inventario_recibido)
+		GameData.inventario_error.connect(_on_inventario_error)
 
-	# Limpiamos los grids por si acaso y pedimos el inventario al servidor
 	_limpiar_grids()
 	GameData.solicitar_inventario()
 	_refresh_header()
@@ -46,9 +46,14 @@ func _limpiar_grids() -> void:
 func _on_inventario_recibido(items: Array) -> void:
 	_limpiar_grids()
 	
+	# Reiniciar métricas al valor base antes de sumar los activos
+	_carga_electrica_actual = 0
+	_temperatura_cd = TEMP_BASE
+	
 	for item_dict in items:
 		var data = InventoryItemData.new()
-		# Mapeamos los campos que vienen del backend (join entre inventario y catalogo)
+		var id_prod = int(item_dict.get("id_producto", 0))
+		
 		data.id_inventario = int(item_dict.get("id_inventario", 0))
 		data.nombre_producto = String(item_dict.get("nombreProducto", "Hardware"))
 		data.categoria = String(item_dict.get("categoria", "Servidor"))
@@ -57,9 +62,12 @@ func _on_inventario_recibido(items: Array) -> void:
 		data.consumo_electrico = int(item_dict.get("consumoElectrico", 0))
 		data.activo = bool(item_dict.get("activo", true))
 		
+		# Cargar la textura usando el nombre del producto
+		data.icon = ImagenesProductos.cargar(data.nombre_producto)
+		
 		_spawn_item(data)
 		
-		# Sumamos consumo eléctrico inicial para las métricas del header
+		# Sumar métricas solo de items activos
 		if data.activo:
 			_carga_electrica_actual += data.consumo_electrico
 			_temperatura_cd += data.impacto_temperatura

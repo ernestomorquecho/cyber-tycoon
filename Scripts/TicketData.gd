@@ -10,7 +10,11 @@ class_name TicketData
 @export var descripcion: String = ""
 @export var titulo: String = ""
 @export var detalle: String = ""
-@export var icon: Texture2D # avatar del contratante (av2.png / av3.png)
+@export var icon: Texture2D # avatar del solicitante (av1.png ... av10.png)
+@export var solicitante: String = "" # nombre de quien pide/reporta el ticket
+# Solo para tickets generados por RequestScheduler (-1 = vino de la API):
+@export var requester_index: int = -1 # posición del solicitante en Helpdesk.REQUESTERS
+@export var request_index: int = -1   # posición dentro de su catálogo de 50 solicitudes
 
 @export var teraflops_requeridos: float = 0.0
 @export var anchoDeBanda_requerido: float = 0.0
@@ -28,3 +32,10 @@ class_name TicketData
 # fecha_limite menos la hora actual, solo para pintar el cronómetro de
 # decisión. El servidor sigue siendo quien de verdad valida los tiempos.
 @export var decision_time_seconds: float = 15.0
+
+
+## Muestra 150.0 como "150" y 4.5 como "4.5" (para las etiquetas de la UI).
+static func fmt_num(value: float) -> String:
+	if is_equal_approx(value, roundf(value)):
+		return str(int(value))
+	return "%.1f" % value

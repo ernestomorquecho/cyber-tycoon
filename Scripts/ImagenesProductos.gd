@@ -1,4 +1,5 @@
 extends RefCounted
+class_name ImagenesProductos
 ## Imagen (sprite PNG) de cada producto del catálogo.
 ##
 ## Igual que las descripciones, se busca por NOMBRE (sin el "(1U)") y no por id,
