@@ -1,17 +1,22 @@
 extends PanelContainer
 
+const Descripciones := preload("res://Scripts/DescripcionesProductos.gd")
+const Imagenes := preload("res://Scripts/ImagenesProductos.gd")
+
 @onready var imagen: TextureRect = $Margin/HBox/Imagen
 @onready var nombre_label: Label = $Margin/HBox/Info/Nombre
 @onready var precio_label: Label = $Margin/HBox/Info/FilaSuperior/Precio
 @onready var boton_comprar: Button = $Margin/HBox/Info/FilaSuperior/BotonComprar
 @onready var categoria_label: Label = $Margin/HBox/Info/Categoria
 @onready var detalle_label: Label = $Margin/HBox/Info/Detalle
+@onready var descripcion_label: Label = $Margin/HBox/Info/Descripcion
 @onready var advertencia_label: Label = $Margin/HBox/Info/Advertencia
 
 var datos_producto: Dictionary
 
 
 func _ready() -> void:
+	imagen.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST # pixel art nítido
 	boton_comprar.pressed.connect(_on_boton_comprar_pressed)
 
 	# Cualquier cambio global de créditos o espacio puede volver
@@ -29,13 +34,50 @@ func cargar_datos(datos: Dictionary) -> void:
 	categoria_label.text = datos.get("categoria", "")
 	precio_label.text = "$ " + str(datos.get("costo", 0.0))
 
-	detalle_label.text = "⚡ %dW   ▤ %dU" % [
-		datos.get("consumoElectrico", 0),
-		datos.get("espacioNecesario", 1),
-	]
+	# Los números vienen de la BD (Catalogo_Productos); solo se muestran los
+	# que el backend mande y sean distintos de cero.
+	var partes := PackedStringArray()
+	partes.append("⚡ %dW" % int(datos.get("consumoElectrico", 0)))
+	partes.append("▤ %dU" % int(datos.get("espacioNecesario", 1)))
 
+	var tflops := int(datos.get("aumento_teraflops", 0))
+	if tflops > 0:
+		partes.append("+%d TFlops" % tflops)
+
+	var watts := int(datos.get("aumento_watts", 0))
+	if watts > 0:
+		partes.append("+%dW cap." % watts)
+
+	var ancho_banda := int(datos.get("impacto_anchoDeBanda", 0))
+	if ancho_banda > 0:
+		partes.append("+%d ancho de banda" % ancho_banda)
+
+	var memoria := int(datos.get("aumento_memoria", 0))
+	if memoria > 0:
+		partes.append("+%d GB" % memoria)
+
+	var temperatura := int(datos.get("impacto_temperatura", 0))
+	if temperatura > 0:
+		partes.append("Calor +%d" % temperatura)
+	elif temperatura < 0:
+		partes.append("Enfría %d" % absi(temperatura))
+
+	detalle_label.text = "   ".join(partes)
+
+	# Descripción: si el backend la manda, esa; si no, la local por nombre.
+	var descripcion := ""
+	if datos.get("descripcion") != null:
+		descripcion = str(datos["descripcion"])
+	if descripcion == "":
+		descripcion = Descripciones.buscar(str(datos.get("nombreProducto", "")))
+	descripcion_label.text = descripcion
+	descripcion_label.visible = descripcion != ""
+
+	# Imagen: una "textura" ya cargada tiene prioridad; si no, se busca por nombre.
 	if datos.has("textura") and datos["textura"] != null:
 		imagen.texture = datos["textura"]
+	else:
+		imagen.texture = Imagenes.cargar(str(datos.get("nombreProducto", "")))
 
 	_actualizar_estado_boton()
 
