@@ -41,6 +41,7 @@ var _rack_nodes: Dictionary = {} # id_rack (int) -> instancia de Rack
 
 
 func _ready() -> void:
+	# Asegúrate de que cada botón abra su respectiva escena en el overlay
 	_inventario_button.pressed.connect(func(): _open_popup(InventarioScene))
 	_tienda_button.pressed.connect(func(): _open_popup(CatalogoScene))
 	_tickets_button.pressed.connect(func(): _open_popup(TicketsScene))
@@ -50,8 +51,10 @@ func _ready() -> void:
 	_poll_timer.timeout.connect(_poll_dashboard)
 	_poll_timer.start()
 
-	_poll_dashboard() # primer refresco inmediato al entrar a la pantalla
+	_rack_container.alignment = BoxContainer.ALIGNMENT_CENTER
+	_rack_container.add_theme_constant_override("separation", 35)
 
+	_poll_dashboard()
 
 func _on_salir_pressed() -> void:
 	# TODO: aquí normalmente se abriría un menú de Opciones/Salir del juego.
@@ -59,8 +62,7 @@ func _on_salir_pressed() -> void:
 
 
 func _open_popup(scene: PackedScene) -> void:
-	# Cierra cualquier ventana emergente anterior antes de abrir la nueva,
-	# para no apilar Tienda + Tickets + Inventario al mismo tiempo.
+	# Cierra cualquier ventana emergente anterior en el overlay antes de abrir la nueva
 	for child in _overlay_layer.get_children():
 		child.queue_free()
 	var instance := scene.instantiate()
@@ -99,30 +101,30 @@ func _apply_dashboard_data(data: Dictionary) -> void:
 
 
 func _ensure_rack(id_rack: int, espacio_usado: int, en_alerta: bool) -> void:
+	var data := RackData.new()
+	data.id_rack = id_rack
+	data.espacio_usado = espacio_usado
+	# Aseguramos que el espacio total coincida con tus gabinetes de 8 bahías
+	data.espacio_total = 8 
+
 	if _rack_nodes.has(id_rack):
 		var rack: Rack = _rack_nodes[id_rack]
-		var data: RackData = RackData.new()
-		data.id_rack = id_rack
-		data.espacio_usado = espacio_usado
 		rack.setup(data)
 		rack.set_alert(en_alerta)
 		return
 
-	# Rack nuevo: la API reportó un id que no teníamos, el carrusel crece
-	# automáticamente hacia la derecha, tal como pide la spec.
-	var data := RackData.new()
-	data.id_rack = id_rack
-	data.espacio_usado = espacio_usado
-
+	# Rack nuevo: se añade al carrusel manteniendo el tamaño estricto del asset
 	var rack_instance: Rack = RackScene.instantiate()
+	
+	# Forzamos el tamaño mínimo de 260x480 que miden tus imágenes de rack
+	rack_instance.custom_minimum_size = Vector2(260, 480)
+	rack_instance.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	
 	_rack_container.add_child(rack_instance)
 	rack_instance.setup(data)
 	rack_instance.set_alert(en_alerta)
 	_rack_nodes[id_rack] = rack_instance
-
-
-# --- Solo para probar el flujo mientras no hay conexión real ---
-
+	
 func _build_mock_dashboard_response() -> Dictionary:
 	return {
 		"metricas": {

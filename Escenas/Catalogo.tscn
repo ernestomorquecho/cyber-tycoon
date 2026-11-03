@@ -4,7 +4,8 @@
 
 [node name="Catalogo" type="Control" unique_id=1548247268 node_paths=PackedStringArray("dinero_label", "rack_label", "mensaje_label", "lista_productos", "boton_cerrar", "boton_cancelar")]
 layout_mode = 3
-anchor_right = 0.9984375
+anchors_preset = 15
+anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2

@@ -48,12 +48,13 @@ func _rebuild_slots() -> void:
 
 	for i in range(_data.espacio_total):
 		var led := ColorRect.new()
-		led.custom_minimum_size = Vector2(10, 10)
+		# Ajusta el ancho a unos 120-140 px para que encaje a lo ancho en el interior del rack,
+		# y el alto a unos 16-20 px para que simule una ranura horizontal de servidor o LED alargado.
+		led.custom_minimum_size = Vector2(130, 18)
 		led.color = COLOR_OK_A if i < _data.espacio_usado else COLOR_EMPTY
 		_slots_grid.add_child(led)
 		if i < _data.espacio_usado:
 			_leds.append(led)
-
 
 func _on_blink_timer_timeout() -> void:
 	_blink_on = not _blink_on

@@ -44,8 +44,9 @@ func _actualizar_estado_boton(_arg = null) -> void:
 	if datos_producto.is_empty():
 		return
 
-	var costo: float = datos_producto.get("costo", 0.0)
-	var espacio: int = datos_producto.get("espacioNecesario", 1)
+	# Forzamos la conversión explícita con float() e int()
+	var costo: float = float(datos_producto.get("costo", 0.0))
+	var espacio: int = int(datos_producto.get("espacioNecesario", 1))
 	var permitido := GameData.puede_comprar(costo, espacio)
 
 	boton_comprar.disabled = not permitido
@@ -56,15 +57,14 @@ func _actualizar_estado_boton(_arg = null) -> void:
 		advertencia_label.visible = true
 		advertencia_label.text = GameData.motivo_bloqueo(costo, espacio)
 
-
 func _on_boton_comprar_pressed() -> void:
-	var id_producto: int = datos_producto.get("id_producto", -1)
-	var costo: float = datos_producto.get("costo", 0.0)
-	var espacio: int = datos_producto.get("espacioNecesario", 1)
+	# Aseguramos también que el ID, costo y espacio entren limpios como números
+	var id_producto: int = int(datos_producto.get("id_producto", -1))
+	var costo: float = float(datos_producto.get("costo", 0.0))
+	var espacio: int = int(datos_producto.get("espacioNecesario", 1))
 
 	boton_comprar.disabled = true
 	GameData.intentar_comprar(id_producto, costo, espacio)
-
 
 func _on_compra_resuelta(id_producto: int, _mensaje: String) -> void:
 	# Solo nos interesa si el resultado corresponde a ESTA tarjeta.

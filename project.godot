@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="CyberTycoon"
-run/main_scene="uid://dmt6f4hcduxau"
+run/main_scene="uid://dt4f3s4aioihg"
 config/features=PackedStringArray("4.6", "Mobile")
 
 [autoload]
