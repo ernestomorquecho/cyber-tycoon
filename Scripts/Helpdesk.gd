@@ -469,3 +469,37 @@ func _on_store_catalog_received(result: int, response_code: int, _headers: Packe
 		print("[Catalogo] OK: los %d productos que piden los tickets coinciden con la tienda." % RequestCatalog.PRODUCTS.size())
 	else:
 		push_warning("[Catalogo] %d diferencia(s) entre los tickets y la tienda; revisa los avisos de arriba." % problems)
+# --- Solo para probar el flujo mientras no hay sesión real ---
+
+func _spawn_mock_tickets_for_testing() -> void:
+	var ddos := TicketData.new()
+	ddos.id_ticket = -1
+	ddos.descripcion = "Ataque DDoS (ticket de prueba, sin sesión real)"
+	ddos.teraflops_requeridos = 4.5
+	ddos.anchoDeBanda_requerido = 100.0
+	ddos.memoriaRequerida = 8.0
+	ddos.recompensa_creditos = 150.0
+	ddos.penalizacion_creditos = 50.0
+	ddos.recompensa_reputacion = 15
+	ddos.penalizacion_reputacion = 20
+	ddos.decision_time_seconds = 15.0
+	ddos.tiempo_para_completado = 20
+	_spawn_ticket(ddos)
+
+	var nomina := TicketData.new()
+	nomina.id_ticket = -2
+	nomina.descripcion = "Procesar Nómina (ticket de prueba, sin sesión real)"
+	nomina.teraflops_requeridos = 2.0
+	nomina.anchoDeBanda_requerido = 20.0
+	nomina.memoriaRequerida = 4.0
+	nomina.recompensa_creditos = 80.0
+	nomina.penalizacion_creditos = 30.0
+	nomina.recompensa_reputacion = 10
+	nomina.penalizacion_reputacion = 15
+	nomina.decision_time_seconds = 25.0
+	nomina.tiempo_para_completado = 30
+	_spawn_ticket(nomina)
+
+
+func _on_close_button_pressed() -> void:
+	get_tree().change_scene_to_file("res://Escenas/Dashboard.tscn")
