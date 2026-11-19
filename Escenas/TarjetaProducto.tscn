@@ -59,7 +59,15 @@ text = "Categoría"
 [node name="Detalle" type="Label" parent="Margin/HBox/Info" unique_id=586711583]
 layout_mode = 2
 theme_override_font_sizes/font_size = 13
+autowrap_mode = 3
 text = "⚡ 0W   ▤ 0U"
+
+[node name="Descripcion" type="Label" parent="Margin/HBox/Info" unique_id=904417731]
+visible = false
+layout_mode = 2
+theme_override_colors/font_color = Color(0.62, 0.67, 0.74, 1)
+theme_override_font_sizes/font_size = 12
+autowrap_mode = 3
 
 [node name="Advertencia" type="Label" parent="Margin/HBox/Info" unique_id=140944268]
 visible = false
