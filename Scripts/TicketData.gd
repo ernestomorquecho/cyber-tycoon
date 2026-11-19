@@ -12,9 +12,14 @@ class_name TicketData
 @export var detalle: String = ""
 @export var icon: Texture2D # avatar del solicitante (av1.png ... av10.png)
 @export var solicitante: String = "" # nombre de quien pide/reporta el ticket
+@export var dificultad: String = ""   # "facil", "media" o "dificil" (solo en tickets del generador)
 # Solo para tickets generados por RequestScheduler (-1 = vino de la API):
 @export var requester_index: int = -1 # posición del solicitante en Helpdesk.REQUESTERS
 @export var request_index: int = -1   # posición dentro de su catálogo de 50 solicitudes
+
+# Productos de la tienda que pide el ticket: { nombreProducto exacto: cantidad }.
+# Si viene vacío (tickets de la API actual) se muestran los requisitos numéricos.
+@export var productos_requeridos: Dictionary = {}
 
 @export var teraflops_requeridos: float = 0.0
 @export var anchoDeBanda_requerido: float = 0.0
