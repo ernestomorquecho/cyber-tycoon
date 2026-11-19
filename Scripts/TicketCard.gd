@@ -48,6 +48,10 @@ var _is_expanded: bool = false
 @onready var _e_toggle: TextureButton = %ExpandedToggle
 @onready var _description_label: Label = %DescriptionLabel
 @onready var _requirements_label: Label = %RequirementsLabel
+@onready var _reward_money: Label = %RewardMoney
+@onready var _reward_rep: Label = %RewardRep
+@onready var _penalty_money: Label = %PenaltyMoney
+@onready var _penalty_rep: Label = %PenaltyRep
 @onready var _process_label: Label = %ProcessLabel
 @onready var _accept_button: TextureButton = %AcceptButton
 @onready var _reject_button: TextureButton = %RejectButton
@@ -78,11 +82,12 @@ func setup(data: TicketData) -> void:
 	_c_title.text = title
 	_e_title.text = title
 	_description_label.text = detail
-	_requirements_label.text = "Requiere:  Teraflops %s   |   Ancho de banda %s   |   Memoria %s" % [
-		String.num(data.teraflops_requeridos),
-		String.num(data.anchoDeBanda_requerido),
-		String.num(data.memoriaRequerida)
-	]
+	_requirements_label.text = _requirements_text(data)
+	# Junto a cada cantidad va su ícono (money.png / repu.png), puestos en la escena.
+	_reward_money.text = "+" + TicketData.fmt_num(data.recompensa_creditos)
+	_reward_rep.text = "+" + TicketData.fmt_num(float(data.recompensa_reputacion))
+	_penalty_money.text = "-" + TicketData.fmt_num(data.penalizacion_creditos)
+	_penalty_rep.text = "-" + TicketData.fmt_num(float(data.penalizacion_reputacion))
 	if data.icon:
 		_avatar.texture = data.icon
 
@@ -90,8 +95,27 @@ func setup(data: TicketData) -> void:
 	_update_labels()
 
 
+## "Requiere: 2× Lenorvo OverThink SR650 (2U), 1× VertiFrío Liebert InRow (2U)".
+## Los tickets de la API actual no traen productos y se quedan con los números.
+func _requirements_text(data: TicketData) -> String:
+	if data.productos_requeridos.is_empty():
+		return "Requiere:  Teraflops %s   |   Ancho de banda %s   |   Memoria %s" % [
+			TicketData.fmt_num(data.teraflops_requeridos),
+			TicketData.fmt_num(data.anchoDeBanda_requerido),
+			TicketData.fmt_num(data.memoriaRequerida)
+		]
+	var parts: Array = []
+	for producto in data.productos_requeridos:
+		parts.append("%d× %s" % [int(data.productos_requeridos[producto]), producto])
+	return "Requiere:  " + ",  ".join(parts)
+
+
 func get_title() -> String:
 	return _c_title.text
+
+
+func get_data() -> TicketData:
+	return _data
 
 
 func _process(_delta: float) -> void:
@@ -114,7 +138,7 @@ func _update_labels() -> void:
 		State.IN_PROGRESS:
 			var txt := _format_time(_process_timer.time_left)
 			_set_time_labels(txt, COLOR_NORMAL, "--:--", COLOR_DIM)
-			_process_label.text = "Procesando: " + txt
+			_process_label.text = "Entregar en: " + txt
 		State.DONE:
 			pass # el texto final se fija una sola vez en _finish()
 
@@ -188,8 +212,8 @@ func _on_decision_timer_timeout() -> void:
 func _on_process_timer_timeout() -> void:
 	if state != State.IN_PROGRESS:
 		return
-	# Aquí es cuando de verdad se le pregunta al servidor si tenías
-	# capacidad suficiente. Antes de esto, nada se da por hecho.
+	# Se acabó el tiempo de cumplimiento (120 s): aquí es cuando de verdad se le
+	# pregunta al servidor si se entregó lo solicitado. Antes, nada se da por hecho.
 	if Session.jwt_token.is_empty():
 		# Solo para poder probar la pantalla sin Login.tscn: resultado simulado.
 		push_warning("[TicketCard] Sin sesión activa, resultado SIMULADO para el ticket %d" % _data.id_ticket)

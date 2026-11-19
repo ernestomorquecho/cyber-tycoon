@@ -5,12 +5,14 @@
 [ext_resource type="Texture2D" path="res://Assets/Tickets/ticketConte.png" id="3"]
 [ext_resource type="Texture2D" path="res://Assets/Tickets/aceptarBut.png" id="4"]
 [ext_resource type="Texture2D" path="res://Assets/Tickets/aceptarBut_pressed.png" id="5"]
-[ext_resource type="Texture2D" path="res://Assets/Tickets/aceptarBut_hover.png" id="6"]
+[ext_resource type="Texture2D" path="res://Assets/Tickets/aceptarBut2.png" id="6"]
 [ext_resource type="Texture2D" path="res://Assets/Tickets/aceptarBut_disabled.png" id="7"]
 [ext_resource type="Texture2D" path="res://Assets/Tickets/rechazarBut.png" id="8"]
 [ext_resource type="Texture2D" path="res://Assets/Tickets/rechazarBut_pressed.png" id="9"]
-[ext_resource type="Texture2D" path="res://Assets/Tickets/rechazarBut_hover.png" id="10"]
+[ext_resource type="Texture2D" path="res://Assets/Tickets/rechazarBut2.png" id="10"]
 [ext_resource type="Texture2D" path="res://Assets/Tickets/rechazarBut_disabled.png" id="11"]
+[ext_resource type="Texture2D" path="res://Assets/Tickets/money.png" id="12"]
+[ext_resource type="Texture2D" path="res://Assets/Tickets/repu.png" id="13"]
 
 [node name="TicketCard" type="Control"]
 custom_minimum_size = Vector2(0, 130)
@@ -138,12 +140,114 @@ anchor_right = 1.0
 offset_left = 122.0
 offset_top = 66.0
 offset_right = -14.0
-offset_bottom = 182.0
+offset_bottom = 112.0
 grow_horizontal = 2
 theme_override_colors/font_color = Color(0.78, 0.82, 0.88, 1)
 theme_override_font_sizes/font_size = 17
 text = "Descripción del ticket..."
 autowrap_mode = 3
+
+[node name="RewardRow" type="HBoxContainer" parent="Expanded"]
+layout_mode = 1
+anchor_right = 1.0
+offset_left = 122.0
+offset_top = 116.0
+offset_right = -14.0
+offset_bottom = 142.0
+grow_horizontal = 2
+theme_override_constants/separation = 8
+
+[node name="RewardRowTitle" type="Label" parent="Expanded/RewardRow"]
+custom_minimum_size = Vector2(118, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.78, 0.82, 0.88, 1)
+theme_override_font_sizes/font_size = 17
+text = "Recompensa:"
+vertical_alignment = 1
+
+[node name="RewardRowMoneyIcon" type="TextureRect" parent="Expanded/RewardRow"]
+custom_minimum_size = Vector2(26, 24)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("12")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="RewardMoney" type="Label" parent="Expanded/RewardRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.9, 0.45, 1)
+theme_override_font_sizes/font_size = 19
+text = "0"
+vertical_alignment = 1
+
+[node name="RewardRowRepIcon" type="TextureRect" parent="Expanded/RewardRow"]
+custom_minimum_size = Vector2(24, 24)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("13")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="RewardRep" type="Label" parent="Expanded/RewardRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(0.3, 0.9, 0.45, 1)
+theme_override_font_sizes/font_size = 19
+text = "0"
+vertical_alignment = 1
+
+[node name="PenaltyRow" type="HBoxContainer" parent="Expanded"]
+layout_mode = 1
+anchor_right = 1.0
+offset_left = 122.0
+offset_top = 146.0
+offset_right = -14.0
+offset_bottom = 172.0
+grow_horizontal = 2
+theme_override_constants/separation = 8
+
+[node name="PenaltyRowTitle" type="Label" parent="Expanded/PenaltyRow"]
+custom_minimum_size = Vector2(118, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.78, 0.82, 0.88, 1)
+theme_override_font_sizes/font_size = 17
+text = "Si falla:"
+vertical_alignment = 1
+
+[node name="PenaltyRowMoneyIcon" type="TextureRect" parent="Expanded/PenaltyRow"]
+custom_minimum_size = Vector2(26, 24)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("12")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="PenaltyMoney" type="Label" parent="Expanded/PenaltyRow"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(60, 0)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.4, 0.4, 1)
+theme_override_font_sizes/font_size = 19
+text = "0"
+vertical_alignment = 1
+
+[node name="PenaltyRowRepIcon" type="TextureRect" parent="Expanded/PenaltyRow"]
+custom_minimum_size = Vector2(24, 24)
+layout_mode = 2
+size_flags_vertical = 4
+texture = ExtResource("13")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="PenaltyRep" type="Label" parent="Expanded/PenaltyRow"]
+unique_name_in_owner = true
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 0.4, 0.4, 1)
+theme_override_font_sizes/font_size = 19
+text = "0"
+vertical_alignment = 1
 
 [node name="RequirementsLabel" type="Label" parent="Expanded"]
 unique_name_in_owner = true
@@ -155,6 +259,7 @@ offset_right = -16.0
 offset_bottom = 228.0
 grow_horizontal = 2
 theme_override_colors/font_color = Color(0.55, 0.8, 1, 1)
+theme_override_constants/line_spacing = -4
 theme_override_font_sizes/font_size = 15
 text = "Requiere: ..."
 autowrap_mode = 3
@@ -171,17 +276,17 @@ offset_bottom = 276.0
 grow_horizontal = 2
 theme_override_colors/font_color = Color(0.89, 0.93, 0.97, 1)
 theme_override_font_sizes/font_size = 20
-text = "Procesando: 00:00"
+text = "Entregar en: 00:00"
 horizontal_alignment = 2
 vertical_alignment = 1
 
 [node name="AcceptButton" type="TextureButton" parent="Expanded"]
 unique_name_in_owner = true
 layout_mode = 1
-offset_left = 18.0
-offset_top = 231.0
-offset_right = 110.0
-offset_bottom = 282.0
+offset_left = 20.0
+offset_top = 236.0
+offset_right = 108.0
+offset_bottom = 277.0
 focus_mode = 0
 texture_normal = ExtResource("4")
 texture_pressed = ExtResource("5")
@@ -193,10 +298,10 @@ stretch_mode = 5
 [node name="RejectButton" type="TextureButton" parent="Expanded"]
 unique_name_in_owner = true
 layout_mode = 1
-offset_left = 117.0
-offset_top = 231.0
-offset_right = 209.0
-offset_bottom = 282.0
+offset_left = 120.0
+offset_top = 235.0
+offset_right = 206.0
+offset_bottom = 277.0
 focus_mode = 0
 texture_normal = ExtResource("8")
 texture_pressed = ExtResource("9")
