@@ -42,21 +42,23 @@ layout_mode = 1
 anchors_preset = 4
 anchor_top = 0.5
 anchor_bottom = 0.5
-offset_left = 16.0
-offset_top = -60.0
-offset_right = 166.0
-offset_bottom = 60.0
+offset_top = -309.0
+offset_right = 150.0
+offset_bottom = 271.0
 grow_vertical = 2
 theme_override_constants/separation = 10
 
 [node name="InventarioButton" type="Button" parent="LeftNav" unique_id=518174460]
 unique_name_in_owner = true
 layout_mode = 2
+size_flags_horizontal = 4
+size_flags_vertical = 4
 text = "INVENTARIO"
 
 [node name="SalirButton" type="Button" parent="LeftNav" unique_id=1723106907]
 unique_name_in_owner = true
 layout_mode = 2
+size_flags_horizontal = 4
 text = "SALIR / OPCIONES"
 
 [node name="RightNav" type="VBoxContainer" parent="." unique_id=1568398813]
@@ -66,10 +68,10 @@ anchor_left = 1.0
 anchor_top = 0.5
 anchor_right = 1.0
 anchor_bottom = 0.5
-offset_left = -166.0
-offset_top = -60.0
-offset_right = -16.0
-offset_bottom = 60.0
+offset_left = -150.0
+offset_top = -309.0
+offset_right = -2.5150146
+offset_bottom = 271.0
 grow_horizontal = 0
 grow_vertical = 2
 theme_override_constants/separation = 10
