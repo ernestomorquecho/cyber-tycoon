@@ -48,7 +48,7 @@ func _ready() -> void:
 # GET /api/tienda/productos
 # ------------------------------------------------------------
 func solicitar_catalogo() -> void:
-	var err := _http_productos.request(API_BASE_URL + "/productos")
+	var err := _http_productos.request(API_BASE_URL + "/catalogo")
 	if err != OK:
 		catalogo_error.emit("No se pudo conectar con el servidor (código %s)." % err)
 

@@ -1,18 +1,34 @@
 extends Control
+## Pantalla de la Tienda / Catálogo. Se abre como popup desde el Dashboard
+## (OverlayLayer), por eso "cerrar" libera esta escena en vez de cambiar de escena.
 
 @export var tarjeta_scene: PackedScene = preload("res://Escenas/TarjetaProducto.tscn")
 
 @export var dinero_label: Label
 @export var rack_label: Label
 @export var mensaje_label: Label
-@export var lista_productos: VBoxContainer
+@export var lista_productos: GridContainer
+@export var barra_filtros: HBoxContainer
 @export var boton_cerrar: Button
 @export var boton_cancelar: Button
 
-# TODO-BACKEND: escena a la que se vuelve al cerrar el catálogo.
-# Ajusta la ruta si tu Dashboard vive en otro lugar, o cambia esta
-# función si el catálogo se usa como popup en vez de escena completa.
+## Columnas de la lista: 1 = filas anchas (recomendado), 2 = cuadrícula.
+@export var columnas: int = 1
+
+const Estilo := preload("res://Scripts/EstiloTienda.gd")
+
+# Solo se usa si esta escena se corre sola (F6) y no como popup del Dashboard.
 const ESCENA_DASHBOARD := "res://Escenas/Dashboard.tscn"
+
+# Pestañas de filtro. "id" debe coincidir con los grupos de EstiloTienda.grupo_de().
+const FILTROS := [
+	{"id": "todos", "texto": "TODOS"},
+	{"id": "servidores", "texto": "SERVIDORES"},
+	{"id": "refrigeracion", "texto": "REFRIGERACIÓN"},
+	{"id": "energia", "texto": "ENERGÍA"},
+	{"id": "redes", "texto": "REDES"},
+	{"id": "otros", "texto": "OTROS"},
+]
 
 # SOLO PARA PROBAR LA UI SIN BACKEND. Si GET /api/tienda/catalogo falla y la
 # lista está vacía, se muestran estos 20 productos. Los nombres son los reales;
@@ -45,6 +61,10 @@ const PRODUCTOS_PRUEBA := [
 ]
 
 var _timer_mensaje: SceneTreeTimer
+var _id_mensaje: int = 0
+var _tarjetas: Array = []
+var _botones_filtro: Dictionary = {}
+var _filtro_actual: String = "todos"
 
 
 func _ready() -> void:
@@ -57,6 +77,12 @@ func _ready() -> void:
 
 	boton_cerrar.pressed.connect(_cerrar_catalogo)
 	boton_cancelar.pressed.connect(_cerrar_catalogo)
+	Estilo.aplicar_boton(boton_cerrar, Estilo.PELIGRO)
+	Estilo.aplicar_boton(boton_cancelar, Estilo.PELIGRO, true)
+
+	lista_productos.columns = columnas
+	mensaje_label.text = ""
+	_crear_filtros()
 
 	# Estado inicial con lo que ya tenga GameData en memoria.
 	_actualizar_dinero(GameData.creditos)
@@ -65,8 +91,14 @@ func _ready() -> void:
 	GameData.solicitar_catalogo()
 
 
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_cancel"): # Esc
+		get_viewport().set_input_as_handled()
+		_cerrar_catalogo()
+
+
 func _actualizar_dinero(nuevo_saldo: float) -> void:
-	dinero_label.text = "$ " + str(nuevo_saldo)
+	dinero_label.text = Estilo.formato_dinero(nuevo_saldo)
 
 
 func _actualizar_rack(ocupado: int, total: int) -> void:
@@ -79,7 +111,7 @@ func _on_catalogo_recibido(productos: Array) -> void:
 
 func _on_catalogo_error(mensaje: String) -> void:
 	_mostrar_mensaje(mensaje, false)
-	if USAR_LISTA_DE_PRUEBA and lista_productos.get_child_count() == 0:
+	if USAR_LISTA_DE_PRUEBA and _tarjetas.is_empty():
 		generar_catalogo(PRODUCTOS_PRUEBA)
 
 
@@ -92,26 +124,80 @@ func _on_compra_fallida(_id_producto: int, mensaje: String) -> void:
 
 
 func _mostrar_mensaje(texto: String, es_exito: bool) -> void:
+	_id_mensaje += 1
 	mensaje_label.text = texto
-	mensaje_label.modulate = Color(0.4, 0.9, 0.5) if es_exito else Color(0.95, 0.35, 0.35)
-	mensaje_label.visible = true
+	mensaje_label.add_theme_color_override(
+		"font_color", Color(0.4, 0.9, 0.5) if es_exito else Estilo.PELIGRO)
 
-	# Ocultar el toast solo (sin bloquear si llega otro mensaje antes).
+	# El mensaje se borra solo; el id evita que un mensaje viejo borre uno nuevo.
 	_timer_mensaje = get_tree().create_timer(2.5)
-	_timer_mensaje.timeout.connect(func():
-		mensaje_label.visible = false
-	)
+	_timer_mensaje.timeout.connect(_limpiar_mensaje.bind(_id_mensaje))
+
+
+func _limpiar_mensaje(id: int) -> void:
+	if id == _id_mensaje:
+		mensaje_label.text = ""
+
+
+# --- Filtros por categoría ---
+
+func _crear_filtros() -> void:
+	var grupo_botones := ButtonGroup.new()
+	for f in FILTROS:
+		var boton := Button.new()
+		boton.text = f["texto"]
+		boton.toggle_mode = true
+		boton.button_group = grupo_botones
+		boton.custom_minimum_size = Vector2(0, 34)
+		var color: Color = Estilo.TEXTO_SECUNDARIO.lightened(0.3) if f["id"] == "todos" else Estilo.color_de(f["id"])
+		Estilo.aplicar_boton(boton, color, true)
+		boton.pressed.connect(_aplicar_filtro.bind(f["id"]))
+		barra_filtros.add_child(boton)
+		_botones_filtro[f["id"]] = boton
+
+	_botones_filtro["todos"].button_pressed = true
+	_botones_filtro["otros"].visible = false
+
+
+func _aplicar_filtro(id: String) -> void:
+	_filtro_actual = id
+	for tarjeta in _tarjetas:
+		if is_instance_valid(tarjeta):
+			tarjeta.visible = (id == "todos" or tarjeta.grupo == id)
+
+	var scroll := lista_productos.get_parent() as ScrollContainer
+	if scroll:
+		scroll.scroll_vertical = 0
 
 
 func generar_catalogo(productos: Array) -> void:
 	for child in lista_productos.get_children():
 		child.queue_free()
+	_tarjetas.clear()
 
+	var conteo := {}
 	for producto in productos:
 		var nueva_tarjeta = tarjeta_scene.instantiate()
 		lista_productos.add_child(nueva_tarjeta)
 		nueva_tarjeta.cargar_datos(producto)
+		_tarjetas.append(nueva_tarjeta)
+		conteo[nueva_tarjeta.grupo] = int(conteo.get(nueva_tarjeta.grupo, 0)) + 1
+
+	# Solo se muestran las pestañas que tienen productos.
+	for f in FILTROS:
+		if f["id"] != "todos":
+			_botones_filtro[f["id"]].visible = conteo.has(f["id"])
+	if _filtro_actual != "todos" and not conteo.has(_filtro_actual):
+		_filtro_actual = "todos"
+		_botones_filtro["todos"].button_pressed = true
+
+	_aplicar_filtro(_filtro_actual)
 
 
 func _cerrar_catalogo() -> void:
-	get_tree().change_scene_to_file(ESCENA_DASHBOARD)
+	if get_tree().current_scene == self:
+		# Corrida sola (F6): no hay Dashboard debajo, se vuelve a él.
+		get_tree().change_scene_to_file(ESCENA_DASHBOARD)
+	else:
+		# Popup del Dashboard: basta con quitarlo, el Dashboard sigue vivo debajo.
+		queue_free()
