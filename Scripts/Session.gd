@@ -7,7 +7,7 @@ class_name Session
 ## automáticamente a datos de prueba en vez de fallar feo con un 401.
 
 static var jwt_token: String = ""
-static var base_url: String = "http://localhost:3000" # TODO: ajustar según dónde corra el backend
+static var base_url: String = "http://127.0.0.1:3000" # Cambiar aquí a la URL del servidor compartido
 
 
 static func auth_headers() -> PackedStringArray:

@@ -1,7 +1,9 @@
 extends Node
 
 # URL base corregida apuntando directo a /api/tienda
-const API_BASE_URL := "http://127.0.0.1:3000/api/tienda"
+var API_BASE_URL: String:
+	get:
+		return Session.base_url + "/api/tienda"
 
 # --- Estado del jugador ---
 var id_usuario: int = 1

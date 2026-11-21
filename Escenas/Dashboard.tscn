@@ -1,6 +1,9 @@
 [gd_scene format=3 uid="uid://dt4f3s4aioihg"]
 
 [ext_resource type="Script" uid="uid://bvbmbofh272ku" path="res://Scripts/Dashboard.gd" id="1"]
+[ext_resource type="Texture2D" uid="uid://vrssfufhfuwa" path="res://Assets/Dashboard/Inventario.png" id="2_egtny"]
+[ext_resource type="Texture2D" uid="uid://yp08l87wwww1" path="res://Assets/Dashboard/Tienda.png" id="3_dkrxe"]
+[ext_resource type="Texture2D" uid="uid://my4u7wu1rktf" path="res://Assets/Dashboard/Tickets.png" id="4_5lahn"]
 
 [node name="Dashboard" type="Control" unique_id=1219129780]
 layout_mode = 3
@@ -46,20 +49,26 @@ offset_top = -309.0
 offset_right = 150.0
 offset_bottom = 271.0
 grow_vertical = 2
-theme_override_constants/separation = 10
+theme_override_constants/separation = 50
+alignment = 1
 
-[node name="InventarioButton" type="Button" parent="LeftNav" unique_id=518174460]
+[node name="InventarioButton" type="TextureButton" parent="LeftNav" unique_id=1933157562]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(135, 135)
 layout_mode = 2
 size_flags_horizontal = 4
 size_flags_vertical = 4
-text = "INVENTARIO"
+texture_normal = ExtResource("2_egtny")
+ignore_texture_size = true
+stretch_mode = 5
 
 [node name="SalirButton" type="Button" parent="LeftNav" unique_id=1723106907]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(135, 135)
 layout_mode = 2
 size_flags_horizontal = 4
-text = "SALIR / OPCIONES"
+text = "SALIR
+/OPCIONES"
 
 [node name="RightNav" type="VBoxContainer" parent="." unique_id=1568398813]
 layout_mode = 1
@@ -70,21 +79,29 @@ anchor_right = 1.0
 anchor_bottom = 0.5
 offset_left = -150.0
 offset_top = -309.0
-offset_right = -2.5150146
 offset_bottom = 271.0
 grow_horizontal = 0
 grow_vertical = 2
-theme_override_constants/separation = 10
+theme_override_constants/separation = 50
+alignment = 1
 
-[node name="TiendaButton" type="Button" parent="RightNav" unique_id=918520665]
+[node name="TiendaButton" type="TextureButton" parent="RightNav" unique_id=236498806]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(135, 135)
 layout_mode = 2
-text = "TIENDA"
+size_flags_horizontal = 4
+texture_normal = ExtResource("3_dkrxe")
+ignore_texture_size = true
+stretch_mode = 5
 
-[node name="TicketsButton" type="Button" parent="RightNav" unique_id=231438289]
+[node name="TicketsButton" type="TextureButton" parent="RightNav" unique_id=812363633]
 unique_name_in_owner = true
+custom_minimum_size = Vector2(135, 135)
 layout_mode = 2
-text = "TICKETS"
+size_flags_horizontal = 4
+texture_normal = ExtResource("4_5lahn")
+ignore_texture_size = true
+stretch_mode = 5
 
 [node name="BottomPanel" type="Control" parent="." unique_id=1586056264]
 layout_mode = 1

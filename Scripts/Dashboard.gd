@@ -29,10 +29,10 @@ const TEMPERATURA_ALERTA := 80.0 # umbral visual local; ajustar con diseño
 
 @onready var _rack_container: HBoxContainer = %RackContainer
 
-@onready var _inventario_button: Button = %InventarioButton
+@onready var _inventario_button: TextureButton = %InventarioButton
 @onready var _salir_button: Button = %SalirButton
-@onready var _tienda_button: Button = %TiendaButton
-@onready var _tickets_button: Button = %TicketsButton
+@onready var _tienda_button: TextureButton = %TiendaButton
+@onready var _tickets_button: TextureButton = %TicketsButton
 
 @onready var _overlay_layer: Control = %OverlayLayer
 @onready var _poll_timer: Timer = $PollTimer
