@@ -9,12 +9,16 @@ var http_request: HTTPRequest
 func _ready() -> void:
 	http_request = HTTPRequest.new()
 	add_child(http_request)
+	http_request.timeout = 10.0
 	http_request.request_completed.connect(_on_login_completed)
-	
-	boton_login.pressed.connect(_on_boton_login_pressed)
+	# OJO: la señal "pressed" de BotonLogin ya está conectada desde Login.tscn
+	# (pestaña Nodo del Inspector). Conectarla también aquí causaba el error
+	# "Signal 'pressed' is already connected".
 
 func _on_boton_login_pressed() -> void:
-	var url = "http://127.0.0.1:3000/api/auth/login"
+	if boton_login.disabled:
+		return # ya hay una petición en curso (evita doble clic)
+	var url = Session.base_url + "/api/auth/login"
 	var headers = PackedStringArray(["Content-Type: application/json"])
 	
 	var payload = {
@@ -26,8 +30,11 @@ func _on_boton_login_pressed() -> void:
 	var err = http_request.request(url, headers, HTTPClient.METHOD_POST, body)
 	if err != OK:
 		print("Error al enviar la solicitud HTTP de login.")
+		return
+	boton_login.disabled = true
 
 func _on_login_completed(_result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
+	boton_login.disabled = false
 	if body.is_empty():
 		print("El servidor no respondió.")
 		return
@@ -35,25 +42,11 @@ func _on_login_completed(_result: int, response_code: int, _headers: PackedStrin
 	var json = JSON.parse_string(body.get_string_from_utf8())
 
 	if response_code == 200 and json is Dictionary:
-		GameData.token_jwt = json.get("token", "")
-		
-		if json.has("usuario"):
-			var u = json["usuario"]
-			GameData.id_usuario = int(u.get("id_usuario", 1))
-			GameData.nombreUsuario = String(u.get("nombreUsuario", "Jugador"))
-			
-			# ESCUDO DE SEGURIDAD: Si la BD manda 0 o nada, forzamos 10000 para la prueba
-			var creditos_recibidos = u.get("creditos")
-			if creditos_recibidos == null or float(str(creditos_recibidos)) <= 0:
-				GameData.creditos = 10000.0
-			else:
-				GameData.creditos = float(str(creditos_recibidos))
-				
-			GameData.creditos_actualizados.emit(GameData.creditos)
-			
-			var espacio_libre = int(u.get("espacioFisicoDisponible", 16))
-			GameData.espacio_ocupado = GameData.espacio_total - espacio_libre
-		
+		# Solo se guarda la sesión. Créditos, espacio y métricas los pide el
+		# Dashboard a GET /api/usuario/dashboard en cuanto se abre (el cliente ya
+		# no inventa valores como los 10000 créditos o los 16 U de antes).
+		var u = json.get("usuario", {})
+		GameData.iniciar_sesion(str(json.get("token", "")), u if u is Dictionary else {})
 		print("¡Login exitoso! Token guardado correctamente.")
 		get_tree().change_scene_to_file("res://Escenas/Dashboard.tscn")
 	else:

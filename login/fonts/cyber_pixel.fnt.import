@@ -1,0 +1,17 @@
+[remap]
+
+importer="font_data_bmfont"
+type="FontFile"
+uid="uid://ca8yo8r14j1ec"
+path="res://.godot/imported/cyber_pixel.fnt-a0044ed47747dc1a57ec42d36eb46127.fontdata"
+
+[deps]
+
+source_file="res://login/fonts/cyber_pixel.fnt"
+dest_files=["res://.godot/imported/cyber_pixel.fnt-a0044ed47747dc1a57ec42d36eb46127.fontdata"]
+
+[params]
+
+fallbacks=[]
+compress=true
+scaling_mode=2

@@ -214,9 +214,10 @@ func _on_process_timer_timeout() -> void:
 		return
 	# Se acabó el tiempo de cumplimiento (120 s): aquí es cuando de verdad se le
 	# pregunta al servidor si se entregó lo solicitado. Antes, nada se da por hecho.
-	if Session.jwt_token.is_empty():
-		# Solo para poder probar la pantalla sin Login.tscn: resultado simulado.
-		push_warning("[TicketCard] Sin sesión activa, resultado SIMULADO para el ticket %d" % _data.id_ticket)
+	if Session.jwt_token.is_empty() or _data.id_ticket <= 0:
+		# Sin sesión, o ticket del generador local (id negativo, no existe en la
+		# base de datos): no hay nada que preguntarle al servidor. Resultado simulado.
+		push_warning("[TicketCard] Ticket %d sin respaldo en el servidor, resultado SIMULADO" % _data.id_ticket)
 		_finish(true, 0.0, 0.0)
 		return
 
