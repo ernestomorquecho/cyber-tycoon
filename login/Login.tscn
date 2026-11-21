@@ -1,0 +1,243 @@
+[gd_scene load_steps=22 format=3]
+
+[ext_resource type="Script" path="res://login/Login.gd" id="1_Login"]
+[ext_resource type="FontFile" path="res://login/fonts/cyber_pixel.fnt" id="2_cyber_pixel"]
+[ext_resource type="Texture2D" path="res://login/assets/bg_tile.png" id="3_bg_tile"]
+[ext_resource type="Texture2D" path="res://login/assets/logo_cyber_tycoon.png" id="4_logo_cyber_t"]
+[ext_resource type="Texture2D" path="res://login/assets/frame_metal_9slice.png" id="5_frame_metal_"]
+[ext_resource type="Texture2D" path="res://login/assets/header_bar_9slice.png" id="6_header_bar_9"]
+[ext_resource type="Texture2D" path="res://login/assets/panel_inner_9slice.png" id="7_panel_inner_"]
+[ext_resource type="Texture2D" path="res://login/assets/card_accent_cyan_9slice.png" id="8_card_accent_"]
+[ext_resource type="Texture2D" path="res://login/assets/input_normal_9slice.png" id="9_input_normal"]
+[ext_resource type="Texture2D" path="res://login/assets/input_focus_9slice.png" id="10_input_focus_"]
+[ext_resource type="Texture2D" path="res://login/assets/input_error_9slice.png" id="11_input_error_"]
+[ext_resource type="Texture2D" path="res://login/assets/title_acceso.png" id="12_title_acceso"]
+[ext_resource type="Texture2D" path="res://login/assets/icon_rack.png" id="13_icon_rack"]
+[ext_resource type="Texture2D" path="res://login/assets/btn_jugar_normal.png" id="14_btn_jugar_no"]
+[ext_resource type="Texture2D" path="res://login/assets/btn_jugar_hover.png" id="15_btn_jugar_ho"]
+[ext_resource type="Texture2D" path="res://login/assets/btn_jugar_pressed.png" id="16_btn_jugar_pr"]
+[ext_resource type="Texture2D" path="res://login/assets/btn_jugar_disabled.png" id="17_btn_jugar_di"]
+
+[sub_resource type="StyleBoxTexture" id="SB_input"]
+content_margin_left = 16.0
+content_margin_top = 8.0
+content_margin_right = 16.0
+content_margin_bottom = 8.0
+texture = ExtResource("9_input_normal")
+texture_margin_left = 12.0
+texture_margin_top = 12.0
+texture_margin_right = 12.0
+texture_margin_bottom = 12.0
+
+[sub_resource type="StyleBoxTexture" id="SB_focus"]
+content_margin_left = 16.0
+content_margin_top = 8.0
+content_margin_right = 16.0
+content_margin_bottom = 8.0
+texture = ExtResource("10_input_focus_")
+texture_margin_left = 12.0
+texture_margin_top = 12.0
+texture_margin_right = 12.0
+texture_margin_bottom = 12.0
+
+[sub_resource type="StyleBoxTexture" id="SB_error"]
+content_margin_left = 16.0
+content_margin_top = 8.0
+content_margin_right = 16.0
+content_margin_bottom = 8.0
+texture = ExtResource("11_input_error_")
+texture_margin_left = 12.0
+texture_margin_top = 12.0
+texture_margin_right = 12.0
+texture_margin_bottom = 12.0
+
+[sub_resource type="Theme" id="Theme_login"]
+default_font = ExtResource("2_cyber_pixel")
+default_font_size = 40
+Label/colors/font_color = Color(0.7882, 0.8000, 0.8196, 1.0)
+Label/colors/font_shadow_color = Color(0, 0, 0, 0)
+LineEdit/colors/caret_color = Color(0.3725, 0.8627, 0.5490, 1.0)
+LineEdit/colors/font_color = Color(0.9098, 0.9176, 0.9333, 1.0)
+LineEdit/colors/font_placeholder_color = Color(0.3529, 0.3765, 0.4157, 1.0)
+LineEdit/colors/font_selected_color = Color(0.0431, 0.0549, 0.0745, 1.0)
+LineEdit/colors/selection_color = Color(0.3098, 0.7647, 0.9686, 0.85)
+LineEdit/constants/caret_width = 4
+LineEdit/constants/minimum_character_width = 0
+LineEdit/styles/focus = SubResource("SB_focus")
+LineEdit/styles/normal = SubResource("SB_input")
+LineEdit/styles/read_only = SubResource("SB_input")
+
+[node name="Login" type="Control"]
+texture_filter = 1
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme = SubResource("Theme_login")
+script = ExtResource("1_Login")
+
+[node name="Fondo" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = ExtResource("3_bg_tile")
+expand_mode = 1
+stretch_mode = 1
+
+[node name="Contenido" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -640.0
+offset_top = -360.0
+offset_right = 640.0
+offset_bottom = 360.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Logo" type="TextureRect" parent="Contenido"]
+layout_mode = 0
+offset_left = 30.0
+offset_top = 228.0
+offset_right = 610.0
+offset_bottom = 492.0
+texture = ExtResource("4_logo_cyber_t")
+expand_mode = 1
+stretch_mode = 0
+
+[node name="Marco" type="NinePatchRect" parent="Contenido"]
+layout_mode = 0
+offset_left = 640.0
+offset_top = 82.0
+offset_right = 1260.0
+offset_bottom = 638.0
+texture = ExtResource("5_frame_metal_")
+patch_margin_left = 32
+patch_margin_top = 32
+patch_margin_right = 32
+patch_margin_bottom = 32
+
+[node name="Encabezado" type="NinePatchRect" parent="Contenido/Marco"]
+layout_mode = 0
+offset_left = 24.0
+offset_top = 24.0
+offset_right = 596.0
+offset_bottom = 112.0
+texture = ExtResource("6_header_bar_9")
+patch_margin_left = 12
+patch_margin_top = 12
+patch_margin_right = 12
+patch_margin_bottom = 12
+
+[node name="Titulo" type="TextureRect" parent="Contenido/Marco/Encabezado"]
+layout_mode = 0
+offset_left = 142.0
+offset_top = 8.0
+offset_right = 430.0
+offset_bottom = 80.0
+texture = ExtResource("12_title_acceso")
+expand_mode = 1
+
+[node name="IconoRack" type="TextureRect" parent="Contenido/Marco/Encabezado"]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 68.0
+offset_bottom = 68.0
+texture = ExtResource("13_icon_rack")
+expand_mode = 1
+
+[node name="Panel" type="NinePatchRect" parent="Contenido/Marco"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 128.0
+offset_right = 580.0
+offset_bottom = 400.0
+texture = ExtResource("7_panel_inner_")
+patch_margin_left = 12
+patch_margin_top = 12
+patch_margin_right = 12
+patch_margin_bottom = 12
+
+[node name="Tarjeta" type="NinePatchRect" parent="Contenido/Marco/Panel"]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 520.0
+offset_bottom = 252.0
+texture = ExtResource("8_card_accent_")
+patch_margin_left = 24
+patch_margin_top = 12
+patch_margin_right = 12
+patch_margin_bottom = 12
+
+[node name="LabelNombre" type="Label" parent="Contenido/Marco/Panel/Tarjeta"]
+layout_mode = 0
+offset_left = 36.0
+offset_top = 16.0
+offset_right = 476.0
+offset_bottom = 56.0
+theme_override_colors/font_color = Color(0.3098, 0.7647, 0.9686, 1.0)
+text = "NOMBRE"
+
+[node name="InputNombre" type="LineEdit" parent="Contenido/Marco/Panel/Tarjeta"]
+layout_mode = 0
+offset_left = 36.0
+offset_top = 56.0
+offset_right = 476.0
+offset_bottom = 112.0
+placeholder_text = "TU NOMBRE"
+max_length = 16
+caret_blink = true
+
+[node name="LabelCodigo" type="Label" parent="Contenido/Marco/Panel/Tarjeta"]
+layout_mode = 0
+offset_left = 36.0
+offset_top = 124.0
+offset_right = 476.0
+offset_bottom = 164.0
+theme_override_colors/font_color = Color(0.7255, 0.5490, 1.0000, 1.0)
+text = "CÓDIGO DE LA CLASE"
+
+[node name="InputCodigo" type="LineEdit" parent="Contenido/Marco/Panel/Tarjeta"]
+layout_mode = 0
+offset_left = 36.0
+offset_top = 164.0
+offset_right = 476.0
+offset_bottom = 220.0
+placeholder_text = "EJ. ABC123"
+max_length = 10
+caret_blink = true
+
+[node name="MensajeError" type="Label" parent="Contenido/Marco"]
+layout_mode = 0
+offset_left = 40.0
+offset_top = 408.0
+offset_right = 580.0
+offset_bottom = 448.0
+theme_override_colors/font_color = Color(0.9490, 0.4196, 0.4196, 1.0)
+text = "COMPLETA AMBOS CAMPOS"
+horizontal_alignment = 1
+
+[node name="BotonJugar" type="TextureButton" parent="Contenido/Marco"]
+layout_mode = 0
+offset_left = 198.0
+offset_top = 460.0
+offset_right = 422.0
+offset_bottom = 520.0
+disabled = true
+mouse_default_cursor_shape = 2
+texture_normal = ExtResource("14_btn_jugar_no")
+texture_pressed = ExtResource("16_btn_jugar_pr")
+texture_hover = ExtResource("15_btn_jugar_ho")
+texture_disabled = ExtResource("17_btn_jugar_di")
+texture_focused = ExtResource("15_btn_jugar_ho")

@@ -41,6 +41,7 @@ const NOTIF_FRAME_W := 168
 const NOTIF_FRAME_H := 141
 
 const PENDIENTES_ENDPOINT := "/api/tickets/pendientes"
+const GENERAR_DEMO_ENDPOINT := "/api/tickets/generar-demo"
 const CATALOGO_ENDPOINT := "/api/tienda/catalogo"
 
 # --- Aparición de tickets ---
@@ -83,6 +84,8 @@ var _spawn_rng := RandomNumberGenerator.new()
 var _spawning: bool = false
 var _api_queue: Array = []   # tickets de la API esperando su turno para salir
 var _catalog_request: HTTPRequest
+var _demo_requested: bool = false # ya se pidió generar-demo en esta apertura
+var _demo_done: bool = false      # ya llegó la respuesta de generar-demo
 
 # Reputación con la que arranca el modo simulación (igual que
 # Usuarios.reputacion DEFAULT 50 en el init.sql). Con la API conectada, el valor
@@ -168,8 +171,8 @@ func _push_notification(text: String) -> void:
 
 func _load_pending_tickets() -> void:
 	if Session.jwt_token.is_empty():
-		# TODO: sin Login.tscn todavía no hay JWT real que mandar. Mientras
-		# tanto las solicitudes las genera RequestScheduler (modo simulación).
+		# Sin login (p. ej. al correr Tickets.tscn suelta con F6) no hay JWT que
+		# mandar: las solicitudes las genera RequestScheduler (modo simulación).
 		push_warning("[Helpdesk] Sin sesión activa, generando solicitudes en modo simulación")
 		_start_simulation()
 		return
@@ -179,6 +182,16 @@ func _load_pending_tickets() -> void:
 
 
 func _on_fetch_completed(_result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
+	if _demo_requested and not _demo_done:
+		# Esta respuesta es la de generar-demo: ahora sí se vuelven a pedir los pendientes.
+		_demo_done = true
+		if response_code != 200:
+			push_warning("[Helpdesk] Error %d al generar tickets demo, pasando a modo simulación" % response_code)
+			_start_simulation()
+			return
+		_fetch_request.request(Session.base_url + PENDIENTES_ENDPOINT, Session.auth_headers(), HTTPClient.METHOD_GET)
+		return
+
 	if response_code != 200:
 		push_warning("[Helpdesk] Error %d al pedir /tickets/pendientes, pasando a modo simulación" % response_code)
 		_start_simulation()
@@ -191,6 +204,14 @@ func _on_fetch_completed(_result: int, response_code: int, _headers: PackedStrin
 		return
 
 	if json.is_empty():
+		if not _demo_requested:
+			# TODO: el backend aún no genera tickets por sí solo. Mientras tanto se
+			# piden los tickets demo (POST /api/tickets/generar-demo) para poder
+			# probar el flujo real aceptar -> resolver contra el servidor.
+			_demo_requested = true
+			print("[Helpdesk] Sin tickets pendientes; solicitando tickets demo al servidor")
+			_fetch_request.request(Session.base_url + GENERAR_DEMO_ENDPOINT, Session.auth_headers(), HTTPClient.METHOD_POST, "{}")
+			return
 		print("[Helpdesk] No hay tickets pendientes ahora mismo")
 
 	for row in json:
@@ -309,6 +330,7 @@ func _on_ticket_resolved(id_ticket: int, exito: bool, creditos_actuales: float, 
 		_change_reputation(data.recompensa_reputacion if (exito and not card.finished_with_error) else -data.penalizacion_reputacion)
 	elif not card.finished_with_error:
 		displayed_reputation = int(reputacion_actual) # ticket de la API: manda el servidor
+		GameData.solicitar_dashboard() # refresca créditos del Dashboard al momento
 	# TODO: esta pantalla no tiene su propio label de créditos/reputación;
 	# lo normal es emitir esto hacia el Dashboard para refrescar su header
 	# en cuanto exista esa conexión entre pantallas.

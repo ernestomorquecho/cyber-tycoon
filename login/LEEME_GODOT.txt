@@ -1,0 +1,45 @@
+LOGIN DE CYBER TYCOON - GODOT 4.x
+=================================
+
+1. Copia la carpeta "login" completa a la RAÍZ de tu proyecto
+   (debe quedar como res://login/Login.tscn). Godot importará todo solo.
+
+2. Project > Project Settings > Display > Window:
+     Viewport Width = 1280, Viewport Height = 720
+   (Opcional) Stretch > Mode = canvas_items, Aspect = keep
+
+3. Abre res://login/Login.tscn y presiona F6 para probarla.
+   Si quieres que sea la primera pantalla del juego:
+   Project Settings > Application > Run > Main Scene = res://login/Login.tscn
+
+Pixel art nítido
+  El nodo raíz "Login" ya tiene Texture Filter = Nearest y sus hijos lo heredan.
+  Si alguna imagen se ve borrosa: Project Settings > Rendering > Textures >
+  Canvas Textures > Default Texture Filter = Nearest.
+
+Fuente
+  fonts/cyber_pixel.fnt (BMFont). Ya está asignada como fuente del Theme de la
+  escena, a tamaño 40 (déjalo en 40 para que se vea pixel-perfect).
+  Las minúsculas se muestran como mayúsculas. Incluye Á É Í Ó Ú Ñ.
+  Para usarla en otras escenas: arrastra cyber_pixel.fnt a la propiedad
+  Theme Overrides > Fonts de cualquier Label, Button o LineEdit.
+
+Cómo funciona (Login.gd)
+  - Escribe en Nombre y Código. JUGAR se activa cuando ambos tienen texto.
+  - Enter en cualquier campo = presionar JUGAR. Tab cambia de campo.
+  - Si intentas jugar con un campo vacío, ese campo se pone con borde rojo.
+  - Al entrar emite la señal login_solicitado(nombre, codigo)
+    (el código se entrega en MAYÚSCULAS).
+  - Cambio de escena: descomenta la línea get_tree().change_scene_to_file(...)
+    en _intentar_jugar() y pon la ruta de tu escena principal.
+
+Nodos
+  Login (Control, script)
+   ├ Fondo (TextureRect en mosaico)
+   └ Contenido (1280x720 centrado)
+      ├ Logo
+      └ Marco (NinePatchRect)
+         ├ Encabezado ─ Titulo, IconoRack
+         ├ Panel ─ Tarjeta ─ LabelNombre, InputNombre, LabelCodigo, InputCodigo
+         ├ MensajeError
+         └ BotonJugar (TextureButton: normal / hover / pressed / disabled)
