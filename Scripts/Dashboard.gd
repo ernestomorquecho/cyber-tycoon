@@ -33,6 +33,8 @@ const TEMPERATURA_ESCALA := 100.0 # tope visual de la barra de temperatura
 @onready var _overlay_layer: Control = %OverlayLayer
 @onready var _poll_timer: Timer = $PollTimer
 
+@export var boton_silencio: Button
+
 var _rack_nodes: Dictionary = {} # id_rack (int) -> instancia de Rack
 var _bar_labels: Dictionary = {} # ProgressBar -> Label con el valor y su unidad
 
@@ -66,6 +68,11 @@ func _ready() -> void:
 	if GameData.estado_recibido:
 		_aplicar_estado()
 	GameData.solicitar_dashboard()
+	
+	# Control de música
+	if boton_silencio:
+		boton_silencio.pressed.connect(_on_boton_silencio_pressed)
+		_actualizar_texto_silencio()
 
 
 ## Salir: cierra la sesión y vuelve al Login.
@@ -166,3 +173,13 @@ static func _formato_miles(valor: float) -> String:
 		if contador % 3 == 0 and i > 0 and entero[i - 1] != "-":
 			resultado = "," + resultado
 	return resultado
+	
+# Control de musica
+func _on_boton_silencio_pressed() -> void:
+	MusicaFondo.stream_paused = not MusicaFondo.stream_paused
+	_actualizar_texto_silencio()
+
+
+func _actualizar_texto_silencio() -> void:
+	if boton_silencio:
+		boton_silencio.text = "MUSICA: OFF" if MusicaFondo.stream_paused else "MUSICA: ON" 

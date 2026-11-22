@@ -17,6 +17,7 @@ config/features=PackedStringArray("4.6", "Mobile")
 [autoload]
 
 GameData="*uid://d1rk2thf5tuul"
+MusicaFondo="*uid://dc4fg0dtwt652"
 
 [display]
 
