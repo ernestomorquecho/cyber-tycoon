@@ -23,6 +23,10 @@ var capacidad_watts: float = 0.0
 var espacio_ocupado: int = 0
 var espacio_total: int = 0
 var racks: Array = []
+var estadisticas: Dictionary = {} # contratos_finalizados, ataques_resueltos, equipos
+# Capacidad apartada por tickets en proceso: {teraflops, memoria, ancho_banda}
+var reservado: Dictionary = {"teraflops": 0, "memoria": 0, "ancho_banda": 0}
+var tickets_pendientes: int = 0 # solicitudes esperando respuesta (globo del botón Tickets)
 var estado_recibido: bool = false # false hasta la primera respuesta del servidor
 
 # Token JWT: la única fuente de verdad es Session.jwt_token (la usan también
@@ -46,8 +50,12 @@ signal inventario_recibido(items: Array)
 signal inventario_error(mensaje: String)
 signal equipo_cambiado(id_inventario: int, exito: bool, encendido: bool, mensaje: String)
 signal equipo_vendido(id_inventario: int, exito: bool, mensaje: String)
+signal partida_reiniciada(exito: bool, mensaje: String)
+signal tickets_recibidos(tablero: Dictionary) # {activos, recientes, eventos}
+signal ticket_respuesta(id_ticket: int, accion: String, exito: bool, mensaje: String, ticket: Dictionary)
 
 var _dashboard_en_curso: bool = false
+var _tickets_en_curso: bool = false
 
 
 # ------------------------------------------------------------
@@ -80,6 +88,10 @@ func aplicar_estado(estado: Dictionary) -> void:
 		return
 	var m: Dictionary = estado.get("metricas", {})
 	estado_partida = str(estado.get("estado_partida", estado_partida))
+	estadisticas = estado.get("estadisticas", estadisticas)
+	reservado = m.get("reservado", reservado)
+	if estado.get("tickets") is Dictionary:
+		tickets_pendientes = int(estado["tickets"].get("pendientes", tickets_pendientes))
 	creditos = float(m.get("creditos", creditos))
 	reputacion = int(m.get("reputacion", reputacion))
 	teraflops = float(m.get("teraflops", teraflops))
@@ -184,6 +196,65 @@ func cambiar_estado_equipo(id_inventario: int, encendido: bool) -> void:
 	)
 
 
+# ------------------------------------------------------------
+# Tickets: el servidor decide expiraciones, reservas y entregas
+# ------------------------------------------------------------
+## GET /api/tickets: procesa en el servidor y devuelve {activos, recientes, eventos, estado}.
+func solicitar_tickets() -> void:
+	if _tickets_en_curso or not hay_sesion():
+		return
+	_tickets_en_curso = true
+	_api(HTTPClient.METHOD_GET, "/api/tickets", null, func(codigo: int, json):
+		_tickets_en_curso = false
+		if codigo == 200 and json is Dictionary:
+			var pendientes := 0
+			for t in json.get("activos", []):
+				if t is Dictionary and str(t.get("estado", "")) == "pendiente":
+					pendientes += 1
+			tickets_pendientes = pendientes
+			aplicar_estado(json.get("estado", {}))
+			tickets_recibidos.emit(json)
+		elif codigo != 401 and codigo != 403:
+			push_warning("[GameData] No se pudieron cargar los tickets: %s" % _mensaje_error(codigo, json, "sin respuesta"))
+	)
+
+
+func aceptar_ticket(id_ticket: int) -> void:
+	_accion_ticket(id_ticket, "aceptar")
+
+
+func rechazar_ticket(id_ticket: int) -> void:
+	_accion_ticket(id_ticket, "rechazar")
+
+
+func _accion_ticket(id_ticket: int, accion: String) -> void:
+	var ruta := "/api/tickets/%d/%s" % [id_ticket, accion]
+	_api(HTTPClient.METHOD_POST, ruta, {}, func(codigo: int, json):
+		if codigo == 200 and json is Dictionary:
+			aplicar_estado(json.get("estado", {}))
+			var ticket = json.get("ticket", {})
+			ticket_respuesta.emit(id_ticket, accion, true, str(json.get("mensaje", "")), ticket if ticket is Dictionary else {})
+		else:
+			ticket_respuesta.emit(id_ticket, accion, false, _mensaje_error(codigo, json, "No se pudo %s el ticket." % accion), {})
+	)
+
+
+func es_game_over() -> bool:
+	return estado_partida == "GAME_OVER"
+
+
+## POST /api/usuario/reset: el servidor borra equipos/tickets y vuelve a los
+## valores iniciales. Aquí solo se aplica el estado que regresa.
+func reiniciar_partida() -> void:
+	_api(HTTPClient.METHOD_POST, "/api/usuario/reset", {}, func(codigo: int, json):
+		if codigo == 200 and json is Dictionary:
+			aplicar_estado(json)
+			partida_reiniciada.emit(true, str(json.get("mensaje", "Partida reiniciada")))
+		else:
+			partida_reiniciada.emit(false, _mensaje_error(codigo, json, "No se pudo reiniciar la partida."))
+	)
+
+
 func vender_equipo(id_inventario: int) -> void:
 	var ruta := "/api/inventario/%d/vender" % id_inventario
 	_api(HTTPClient.METHOD_POST, ruta, {}, func(codigo: int, json):
@@ -215,6 +286,12 @@ func _api(metodo: HTTPClient.Method, ruta: String, cuerpo: Variant, al_terminar:
 			json = JSON.parse_string(body.get_string_from_utf8())
 		if con_token and (codigo == 401 or codigo == 403):
 			sesion_expirada.emit()
+		elif codigo == 409 and json is Dictionary and str(json.get("codigo", "")) == "GAME_OVER":
+			# Cualquier acción rechazada por fin de partida: se avisa a todas las
+			# pantallas y se piden las estadísticas finales al servidor.
+			estado_partida = "GAME_OVER"
+			estado_actualizado.emit()
+			solicitar_dashboard()
 		al_terminar.call(codigo, json)
 	)
 

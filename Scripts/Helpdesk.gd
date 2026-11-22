@@ -40,8 +40,6 @@ const NOTIF_SHEET: Texture2D = preload("res://Assets/Tickets/notificacion_sheet.
 const NOTIF_FRAME_W := 168
 const NOTIF_FRAME_H := 141
 
-const PENDIENTES_ENDPOINT := "/api/tickets/pendientes"
-const GENERAR_DEMO_ENDPOINT := "/api/tickets/generar-demo"
 const CATALOGO_ENDPOINT := "/api/tienda/catalogo"
 
 # --- Aparición de tickets ---
@@ -57,9 +55,6 @@ const SPAWN_INTERVAL_MAX_SECONDS := 30.0
 const REQUESTER_COOLDOWN_SECONDS := 60.0   # espera global del solicitante tras completar/rechazar
 const REQUEST_COOLDOWN_SECONDS := 600.0    # espera individual de la solicitud que acaba de resolverse
 
-# Tiempos por defecto cuando la API no los manda (hoy el backend no los guarda):
-const DEFAULT_DECISION_SECONDS := 60.0  # 1 min para aceptar; si no, el ticket caduca
-const DEFAULT_PROCESS_SECONDS := 120    # 2 min para entregar lo solicitado, o falla
 const TAB_ACTIVE := Color(1, 1, 1, 1)
 const TAB_INACTIVE := Color(0.5, 0.5, 0.55, 1)
 
@@ -71,7 +66,6 @@ const TAB_INACTIVE := Color(0.5, 0.5, 0.55, 1)
 @onready var _notifications_tab: TextureButton = %NotificationsTab
 @onready var _done_tab: TextureButton = %DoneTab
 @onready var _close_button: Button = %CloseButton
-@onready var _fetch_request: HTTPRequest = $FetchRequest
 
 var _current_tab: Tab = Tab.TODO
 var _unread: int = 0
@@ -82,10 +76,7 @@ var _sim_ticket_counter: int = 0
 var _spawn_timer: Timer
 var _spawn_rng := RandomNumberGenerator.new()
 var _spawning: bool = false
-var _api_queue: Array = []   # tickets de la API esperando su turno para salir
 var _catalog_request: HTTPRequest
-var _demo_requested: bool = false # ya se pidió generar-demo en esta apertura
-var _demo_done: bool = false      # ya llegó la respuesta de generar-demo
 
 # Reputación con la que arranca el modo simulación (igual que
 # Usuarios.reputacion DEFAULT 50 en el init.sql). Con la API conectada, el valor
@@ -102,7 +93,6 @@ func _ready() -> void:
 	_todo_tab.pressed.connect(_show_tab.bind(Tab.TODO))
 	_notifications_tab.pressed.connect(_show_tab.bind(Tab.NOTIFICATIONS))
 	_done_tab.pressed.connect(_show_tab.bind(Tab.DONE))
-	_fetch_request.request_completed.connect(_on_fetch_completed)
 
 	_spawn_rng.randomize()
 	_spawn_timer = Timer.new()
@@ -167,110 +157,134 @@ func _push_notification(text: String) -> void:
 		_update_badge()
 
 
-# --- Carga real desde la API, con fallback a datos de prueba ---
+# --- Modo servidor: el backend genera, expira, reserva y entrega los tickets ---
+# Cada POLL_SEGUNDOS se pide GET /api/tickets (vía GameData) y las tarjetas se
+# sincronizan por id_ticket. Sin sesión (Tickets.tscn con F6) se usa la simulación.
+
+const POLL_SEGUNDOS := 3.0
+var _modo_servidor: bool = false
+var _cards_por_id: Dictionary = {}  # id_ticket -> TicketCard en la bandeja "Por hacer"
+var _primera_carga: bool = true
+var _poll_timer: Timer
+
 
 func _load_pending_tickets() -> void:
-	if Session.jwt_token.is_empty():
-		# Sin login (p. ej. al correr Tickets.tscn suelta con F6) no hay JWT que
-		# mandar: las solicitudes las genera RequestScheduler (modo simulación).
+	if not GameData.hay_sesion():
 		push_warning("[Helpdesk] Sin sesión activa, generando solicitudes en modo simulación")
 		_start_simulation()
 		return
 
-	var url := Session.base_url + PENDIENTES_ENDPOINT
-	_fetch_request.request(url, Session.auth_headers(), HTTPClient.METHOD_GET)
+	_modo_servidor = true
+	GameData.tickets_recibidos.connect(_on_tickets_recibidos)
+	_poll_timer = Timer.new()
+	_poll_timer.wait_time = POLL_SEGUNDOS
+	add_child(_poll_timer)
+	_poll_timer.timeout.connect(GameData.solicitar_tickets)
+	_poll_timer.start()
+	GameData.solicitar_tickets()
 
 
-func _on_fetch_completed(_result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
-	if _demo_requested and not _demo_done:
-		# Esta respuesta es la de generar-demo: ahora sí se vuelven a pedir los pendientes.
-		_demo_done = true
-		if response_code != 200:
-			push_warning("[Helpdesk] Error %d al generar tickets demo, pasando a modo simulación" % response_code)
-			_start_simulation()
-			return
-		_fetch_request.request(Session.base_url + PENDIENTES_ENDPOINT, Session.auth_headers(), HTTPClient.METHOD_GET)
-		return
+func _on_tickets_recibidos(tablero: Dictionary) -> void:
+	var activos: Array = tablero.get("activos", [])
+	var recientes: Array = tablero.get("recientes", [])
 
-	if response_code != 200:
-		push_warning("[Helpdesk] Error %d al pedir /tickets/pendientes, pasando a modo simulación" % response_code)
-		_start_simulation()
-		return
+	# 1) Tickets activos: crear los nuevos y ajustar cronómetros de los existentes
+	var vistos := {}
+	for fila in activos:
+		if not fila is Dictionary:
+			continue
+		var id := int(fila.get("id_ticket", 0))
+		vistos[id] = true
+		var card = _cards_por_id.get(id)
+		if card == null or not is_instance_valid(card):
+			card = _spawn_ticket(_ticket_data_desde_json(fila))
+			_cards_por_id[id] = card
+			if not _primera_carga:
+				_push_notification("Nueva solicitud: %s" % card.get_title())
+		card.sincronizar(fila)
 
-	var json = JSON.parse_string(body.get_string_from_utf8())
-	if json == null or typeof(json) != TYPE_ARRAY:
-		push_warning("[Helpdesk] Respuesta inesperada de /tickets/pendientes, pasando a modo simulación")
-		_start_simulation()
-		return
+	# 2) Los que ya no están activos: el servidor los completó, falló, rechazó o expiró
+	var finales := {}
+	for fila in recientes:
+		if fila is Dictionary:
+			finales[int(fila.get("id_ticket", 0))] = str(fila.get("estado", ""))
+	for id in _cards_por_id.keys():
+		if vistos.has(id):
+			continue
+		var card = _cards_por_id[id]
+		_cards_por_id.erase(id)
+		if is_instance_valid(card) and not card.is_queued_for_deletion():
+			_cerrar_desde_servidor(card, finales.get(id, ""))
 
-	if json.is_empty():
-		if not _demo_requested:
-			# TODO: el backend aún no genera tickets por sí solo. Mientras tanto se
-			# piden los tickets demo (POST /api/tickets/generar-demo) para poder
-			# probar el flujo real aceptar -> resolver contra el servidor.
-			_demo_requested = true
-			print("[Helpdesk] Sin tickets pendientes; solicitando tickets demo al servidor")
-			_fetch_request.request(Session.base_url + GENERAR_DEMO_ENDPOINT, Session.auth_headers(), HTTPClient.METHOD_POST, "{}")
-			return
-		print("[Helpdesk] No hay tickets pendientes ahora mismo")
-
-	for row in json:
-		_api_queue.append(row) # salen de uno en uno, ver _on_spawn_timer_timeout
-	_begin_spawning()
+	# 3) Al abrir la pantalla, la pestaña "Completados" muestra el historial reciente
+	if _primera_carga:
+		_primera_carga = false
+		for fila in recientes:
+			var estado_final := str(fila.get("estado", ""))
+			if estado_final == "completado" or estado_final == "fallido":
+				var card := _spawn_ticket(_ticket_data_desde_json(fila), _done_list, false)
+				card.finalizar_desde_servidor(estado_final == "completado")
 
 
-func _spawn_ticket_from_json(row: Dictionary) -> void:
+func _cerrar_desde_servidor(card: TicketCard, estado_final: String) -> void:
+	match estado_final:
+		"completado", "fallido":
+			# Emite ticket_resolved -> _on_ticket_resolved la pasa a "Completados".
+			card.finalizar_desde_servidor(estado_final == "completado")
+		"expirado":
+			_push_notification("Caducó sin respuesta: %s (-5 de reputación)" % card.get_title())
+			card.queue_free()
+		_:
+			card.queue_free() # rechazado: ya se avisó al recibir la respuesta
+
+
+func _ticket_data_desde_json(fila: Dictionary) -> TicketData:
 	var data := TicketData.new()
-	data.id_ticket = int(row.get("id_ticket", 0))
-	data.descripcion = str(row.get("descripcion", ""))
+	data.id_ticket = int(fila.get("id_ticket", 0))
+	data.descripcion = str(fila.get("titulo", fila.get("descripcion", "")))
 	data.titulo = data.descripcion
-	data.teraflops_requeridos = float(row.get("teraflops_requeridos", 0))
-	data.anchoDeBanda_requerido = float(row.get("anchoDeBanda_requerido", 0))
-	data.memoriaRequerida = float(row.get("memoriaRequerida", 0))
-	data.recompensa_creditos = float(row.get("recompensa_creditos", 0))
-	data.penalizacion_creditos = float(row.get("penalizacion_creditos", 0))
-	data.recompensa_reputacion = int(row.get("recompensa_reputacion", 0))
-	data.penalizacion_reputacion = int(row.get("penalizacion_reputacion", 0))
-	# OJO: el init.sql actual de Tickets_Soporte NO tiene fecha_limite ni
-	# tiempoParaCompletado, así que normalmente no llegan. Si algún día las
-	# agregan (aunque vengan en null), se usan; si no, valen los tiempos por defecto.
-	var fecha = row.get("fecha_limite")
-	data.fecha_limite = fecha if typeof(fecha) == TYPE_STRING else ""
-	var proceso = row.get("tiempoParaCompletado")
-	var tiene_proceso: bool = (typeof(proceso) == TYPE_INT or typeof(proceso) == TYPE_FLOAT) and proceso > 0
-	data.tiempo_para_completado = int(proceso) if tiene_proceso else DEFAULT_PROCESS_SECONDS
-	data.decision_time_seconds = _seconds_until(data.fecha_limite)
-	# La tabla no trae un texto largo; las recompensas y penalizaciones reales
-	# del ticket se muestran en la tarjeta junto a los íconos de dinero y reputación.
-	_spawn_ticket(data)
+	data.dificultad = str(fila["dificultad"]) if fila.get("dificultad") != null else ""
+	data.teraflops_requeridos = float(fila.get("teraflops_requeridos", 0))
+	data.anchoDeBanda_requerido = float(fila.get("anchoDeBanda_requerido", 0))
+	data.memoriaRequerida = float(fila.get("memoriaRequerida", 0))
+	data.recompensa_creditos = float(fila.get("recompensa_creditos", 0))
+	data.penalizacion_creditos = float(fila.get("penalizacion_creditos", 0))
+	data.recompensa_reputacion = int(fila.get("recompensa_reputacion", 0))
+	data.penalizacion_reputacion = int(fila.get("penalizacion_reputacion", 0))
+	var requiere = fila.get("requiere", {})
+	data.productos_requeridos = requiere if requiere is Dictionary else {}
+	var decidir = fila.get("segundos_para_decidir")
+	data.decision_time_seconds = float(decidir) if decidir != null else 0.1
+	data.tiempo_para_completado = int(fila.get("tiempo_proceso_seg", 120))
+	var solicitante = fila.get("solicitante")
+	if solicitante != null:
+		_assign_requester(data, posmod(int(solicitante), REQUESTERS.size()))
+	# Los productos del diseño original se muestran como "equipo sugerido";
+	# lo que de verdad se aparta al aceptar son los TFLOPS / RAM / ancho de banda.
+	if not data.productos_requeridos.is_empty():
+		var partes: Array = []
+		for producto in data.productos_requeridos:
+			partes.append("%d× %s" % [int(data.productos_requeridos[producto]), producto])
+		data.detalle = "Equipo sugerido: " + ", ".join(partes)
+	return data
 
 
-func _seconds_until(fecha_limite_iso: String) -> float:
-	if fecha_limite_iso.is_empty():
-		return DEFAULT_DECISION_SECONDS
-	# MySQL/Node regresan algo como "2026-10-28T03:26:13.000Z": se queda con la
-	# parte "AAAA-MM-DDTHH:MM:SS" (hora UTC).
-	# Cálculo LOCAL solo para pintar el cronómetro; el servidor es quien de
-	# verdad decide si seguía a tiempo cuando llegue /resolver.
-	var limite_unix := Time.get_unix_time_from_datetime_string(fecha_limite_iso.substr(0, 19))
-	var ahora_unix := Time.get_unix_time_from_system()
-	return maxf(1.0, float(limite_unix - ahora_unix))
-
-
-func _spawn_ticket(data: TicketData) -> void:
+func _spawn_ticket(data: TicketData, lista: VBoxContainer = null, conectar: bool = true) -> TicketCard:
 	if data.icon == null or data.solicitante.is_empty():
 		# Mismo ticket = mismo solicitante siempre (depende del id, no es aleatorio).
 		_assign_requester(data, posmod(data.id_ticket - 1, REQUESTERS.size()))
 	data.detalle = _compose_detail(data)
 
 	var card: TicketCard = TicketCardScene.instantiate()
-	_todo_list.add_child(card)
+	(lista if lista != null else _todo_list).add_child(card)
 	card.setup(data)
 
-	card.ticket_accepted.connect(_on_ticket_accepted.bind(card))
-	card.ticket_rejected.connect(_on_ticket_rejected.bind(card))
-	card.ticket_expired.connect(_on_ticket_expired.bind(card))
-	card.ticket_resolved.connect(_on_ticket_resolved.bind(card))
+	if conectar:
+		card.ticket_accepted.connect(_on_ticket_accepted.bind(card))
+		card.ticket_rejected.connect(_on_ticket_rejected.bind(card))
+		card.ticket_expired.connect(_on_ticket_expired.bind(card))
+		card.ticket_resolved.connect(_on_ticket_resolved.bind(card))
+	return card
 
 
 func _assign_requester(data: TicketData, index: int) -> void:
@@ -304,10 +318,14 @@ func _on_ticket_accepted(id_ticket: int, _card: TicketCard) -> void:
 
 
 func _on_ticket_rejected(id_ticket: int, card: TicketCard) -> void:
-	print("[Helpdesk] Ticket rechazado (-5 reputación, SOLO VISUAL, falta endpoint real): ", id_ticket)
-	_change_reputation(-5)
+	print("[Helpdesk] Ticket rechazado: ", id_ticket)
+	if _modo_servidor:
+		_cards_por_id.erase(id_ticket)
+		displayed_reputation = GameData.reputacion # ya la descontó el servidor
+	else:
+		_change_reputation(-5)
 	_release_requester(card, "rechazada")
-	_push_notification("Rechazaste: %s" % card.get_title())
+	_push_notification("Rechazaste: %s (-5 de reputación)" % card.get_title())
 
 
 func _on_ticket_expired(id_ticket: int, card: TicketCard) -> void:
@@ -328,12 +346,10 @@ func _on_ticket_resolved(id_ticket: int, exito: bool, creditos_actuales: float, 
 		# Ticket del generador local (no hay servidor que decida): la reputación se
 		# mueve aquí con los valores del propio ticket.
 		_change_reputation(data.recompensa_reputacion if (exito and not card.finished_with_error) else -data.penalizacion_reputacion)
-	elif not card.finished_with_error:
-		displayed_reputation = int(reputacion_actual) # ticket de la API: manda el servidor
-		GameData.solicitar_dashboard() # refresca créditos del Dashboard al momento
-	# TODO: esta pantalla no tiene su propio label de créditos/reputación;
-	# lo normal es emitir esto hacia el Dashboard para refrescar su header
-	# en cuanto exista esa conexión entre pantallas.
+	else:
+		# Ticket del servidor: créditos y reputación ya vienen aplicados en GameData
+		# (el Dashboard se actualiza solo con GameData.estado_actualizado).
+		displayed_reputation = GameData.reputacion
 
 	_release_requester(card, "completada")
 	card.reparent(_done_list)
@@ -413,9 +429,6 @@ func _try_spawn_one() -> bool:
 		if pair.x < 0:
 			return false
 		_spawn_simulated_ticket(pair.x, pair.y)
-		return true
-	if not _api_queue.is_empty():
-		_spawn_ticket_from_json(_api_queue.pop_front())
 		return true
 	return false
 
