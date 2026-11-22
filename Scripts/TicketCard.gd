@@ -6,6 +6,13 @@ class_name TicketCard
 ##   - Expanded  -> ticketConte.png (avatar, título, tiempo, descripción,
 ##                                   requisitos, cronómetro de proceso y botones)
 ## Un clic en el encabezado alterna entre las dos (acordeón).
+##
+## Dos modos:
+##   - SERVIDOR (ticket con id > 0 y sesión activa): aceptar/rechazar se piden a
+##     POST /api/tickets/:id/aceptar|rechazar; los cronómetros solo se pintan, el
+##     servidor es quien expira y entrega. Helpdesk sincroniza con sincronizar()
+##     y finalizar_desde_servidor().
+##   - SIMULACIÓN (sin sesión, p. ej. Tickets.tscn con F6): todo es local.
 
 signal ticket_accepted(id_ticket: int)
 signal ticket_rejected(id_ticket: int)
@@ -14,13 +21,13 @@ signal ticket_resolved(id_ticket: int, exito: bool, creditos_actuales: float, re
 
 ## REQUEST     = solicitud esperando que el jugador acepte o rechace
 ## IN_PROGRESS = aceptada, corriendo el cronómetro de proceso
-## DONE        = ya resuelta (éxito, fallo o error de red)
+## DONE        = ya resuelta (éxito o fallo)
 enum State { REQUEST, IN_PROGRESS, DONE }
 
-const RESOLVER_ENDPOINT := "/api/tickets/resolver"
 const COLLAPSED_HEIGHT := 130.0 # alto de ticketSoli.png
 const EXPANDED_HEIGHT := 290.0  # alto de ticketConte.png
 const URGENT_SECONDS := 5.0
+const DESFASE_TOLERADO := 2.0   # segundos de diferencia con el servidor antes de corregir el reloj
 
 const COLOR_NORMAL := Color(0.89, 0.93, 0.97)
 const COLOR_DIM := Color(0.55, 0.62, 0.7)
@@ -29,11 +36,12 @@ const COLOR_OK := Color(0.3, 0.9, 0.45)
 const COLOR_FAIL := Color(1.0, 0.4, 0.4)
 
 var state: State = State.REQUEST
-var result_text: String = ""          # "RESUELTO", "FALLIDO" o "ERROR 401"...
+var result_text: String = ""          # "RESUELTO" o "FALLIDO"
 var finished_with_error: bool = false
 
 var _data: TicketData
 var _is_expanded: bool = false
+var _esperando: bool = false # hay una petición al servidor en curso
 
 @onready var _collapsed: NinePatchRect = %Collapsed
 @onready var _expanded: NinePatchRect = %Expanded
@@ -58,7 +66,6 @@ var _is_expanded: bool = false
 
 @onready var _decision_timer: Timer = $DecisionTimer
 @onready var _process_timer: Timer = $ProcessTimer
-@onready var _resolve_request: HTTPRequest = $ResolveRequest
 
 
 func _ready() -> void:
@@ -68,7 +75,7 @@ func _ready() -> void:
 	_reject_button.pressed.connect(_on_reject_pressed)
 	_decision_timer.timeout.connect(_on_decision_timer_timeout)
 	_process_timer.timeout.connect(_on_process_timer_timeout)
-	_resolve_request.request_completed.connect(_on_resolve_completed)
+	GameData.ticket_respuesta.connect(_on_ticket_respuesta)
 
 	_process_label.visible = false
 	_set_expanded(false)
@@ -91,18 +98,22 @@ func setup(data: TicketData) -> void:
 	if data.icon:
 		_avatar.texture = data.icon
 
-	_decision_timer.start(data.decision_time_seconds)
+	_decision_timer.start(maxf(0.1, data.decision_time_seconds))
 	_update_labels()
 
 
-## "Requiere: 2× Lenorvo OverThink SR650 (2U), 1× VertiFrío Liebert InRow (2U)".
-## Los tickets de la API actual no traen productos y se quedan con los números.
+func _modo_servidor() -> bool:
+	return _data != null and _data.id_ticket > 0 and GameData.hay_sesion()
+
+
+## Servidor: la capacidad que se APARTA al aceptar (TFLOPS / RAM / ancho de banda).
+## Simulación: "Requiere: 2× Lenorvo OverThink SR650 (2U), 1× ...".
 func _requirements_text(data: TicketData) -> String:
-	if data.productos_requeridos.is_empty():
-		return "Requiere:  Teraflops %s   |   Ancho de banda %s   |   Memoria %s" % [
+	if data.id_ticket > 0 or data.productos_requeridos.is_empty():
+		return "Requiere:  %s TFLOPS   |   %s GB RAM   |   %s ancho de banda" % [
 			TicketData.fmt_num(data.teraflops_requeridos),
-			TicketData.fmt_num(data.anchoDeBanda_requerido),
-			TicketData.fmt_num(data.memoriaRequerida)
+			TicketData.fmt_num(data.memoriaRequerida),
+			TicketData.fmt_num(data.anchoDeBanda_requerido)
 		]
 	var parts: Array = []
 	for producto in data.productos_requeridos:
@@ -138,7 +149,8 @@ func _update_labels() -> void:
 		State.IN_PROGRESS:
 			var txt := _format_time(_process_timer.time_left)
 			_set_time_labels(txt, COLOR_NORMAL, "--:--", COLOR_DIM)
-			_process_label.text = "Entregar en: " + txt
+			if not _process_timer.is_stopped():
+				_process_label.text = "Entregar en: " + txt
 		State.DONE:
 			pass # el texto final se fija una sola vez en _finish()
 
@@ -166,31 +178,70 @@ func _set_expanded(value: bool) -> void:
 # --- Botones ---
 
 func _on_accept_pressed() -> void:
-	if state != State.REQUEST:
+	if state != State.REQUEST or _esperando:
 		return
-	state = State.IN_PROGRESS
-	_decision_timer.stop()
-	_process_timer.start(_data.tiempo_para_completado)
-	_process_label.visible = true
-	_refresh_buttons()
+	if _modo_servidor():
+		_set_esperando(true)
+		GameData.aceptar_ticket(_data.id_ticket)
+		return
+	_iniciar_proceso(float(_data.tiempo_para_completado))
 	ticket_accepted.emit(_data.id_ticket)
 
 
 func _on_reject_pressed() -> void:
-	if state != State.REQUEST:
+	if state != State.REQUEST or _esperando:
+		return
+	if _modo_servidor():
+		_set_esperando(true)
+		GameData.rechazar_ticket(_data.id_ticket)
 		return
 	_decision_timer.stop()
-	# TODO: el backend todavía NO tiene un endpoint de "rechazar" (solo existe
-	# /api/tickets/resolver, que siempre evalúa capacidad). La penalización de
-	# -5 reputación de la spec no se está aplicando de verdad todavía; hace
-	# falta pedir al equipo de backend algo como
-	# POST /api/tickets/descartar { id_ticket }.
 	ticket_rejected.emit(_data.id_ticket)
 	queue_free()
 
 
+## Respuesta del servidor a aceptar / rechazar ESTA tarjeta.
+func _on_ticket_respuesta(id_ticket: int, accion: String, exito: bool, mensaje: String, ticket: Dictionary) -> void:
+	if _data == null or id_ticket != _data.id_ticket:
+		return
+	_set_esperando(false)
+	if not exito:
+		# p. ej. INSUFFICIENT_RESOURCES: la tarjeta se queda como solicitud y explica por qué.
+		_mostrar_aviso(mensaje)
+		return
+	if accion == "aceptar":
+		_iniciar_proceso(float(ticket.get("segundos_para_entregar", _data.tiempo_para_completado)))
+		ticket_accepted.emit(_data.id_ticket)
+	else:
+		_decision_timer.stop()
+		ticket_rejected.emit(_data.id_ticket)
+		queue_free()
+
+
+func _set_esperando(valor: bool) -> void:
+	_esperando = valor
+	_accept_button.disabled = valor or state != State.REQUEST
+	_reject_button.disabled = valor or state != State.REQUEST
+
+
+func _mostrar_aviso(texto: String) -> void:
+	_process_label.text = texto
+	_process_label.add_theme_color_override("font_color", COLOR_FAIL)
+	_process_label.visible = true
+	_set_expanded(true)
+
+
+func _iniciar_proceso(segundos: float) -> void:
+	state = State.IN_PROGRESS
+	_decision_timer.stop()
+	_process_timer.start(maxf(0.1, segundos))
+	_process_label.remove_theme_color_override("font_color")
+	_process_label.visible = true
+	_refresh_buttons()
+
+
 func _refresh_buttons() -> void:
-	var can_decide := state == State.REQUEST
+	var can_decide := state == State.REQUEST and not _esperando
 	_accept_button.disabled = not can_decide
 	_reject_button.disabled = not can_decide
 	# Ya resuelto: los botones dejan de tener sentido.
@@ -198,13 +249,42 @@ func _refresh_buttons() -> void:
 	_reject_button.visible = state != State.DONE
 
 
+# --- Sincronía con el servidor (la llama Helpdesk en cada consulta) ---
+
+## Ajusta estado y cronómetros a lo que dice el servidor para este ticket activo.
+func sincronizar(fila: Dictionary) -> void:
+	if state == State.DONE:
+		return
+	var estado_srv := str(fila.get("estado", ""))
+	if estado_srv == "en_proceso":
+		var entrega := float(fila.get("segundos_para_entregar", 0))
+		if state == State.REQUEST:
+			_iniciar_proceso(entrega)
+		elif not _process_timer.is_stopped() and absf(_process_timer.time_left - entrega) > DESFASE_TOLERADO:
+			_process_timer.start(maxf(0.1, entrega))
+	elif estado_srv == "pendiente" and state == State.REQUEST:
+		var decidir := float(fila.get("segundos_para_decidir", 0))
+		if not _decision_timer.is_stopped() and absf(_decision_timer.time_left - decidir) > DESFASE_TOLERADO:
+			_decision_timer.start(maxf(0.1, decidir))
+
+
+## El servidor ya lo entregó: completado (true) o fallido (false).
+func finalizar_desde_servidor(completado: bool) -> void:
+	if state != State.DONE:
+		_finish(completado, 0.0, float(GameData.reputacion))
+
+
 # --- Cronómetros ---
 
 func _on_decision_timer_timeout() -> void:
 	if state != State.REQUEST:
 		return
-	# TODO: mismo caso que el rechazo, no existe todavía un endpoint de
-	# "caducó" que aplique los -20 de reputación de la spec en el servidor.
+	if _modo_servidor():
+		# El servidor lo marca como EXPIRADO; Helpdesk quita la tarjeta en la próxima consulta.
+		_set_time_labels("00:00", COLOR_URGENT, "00:00", COLOR_URGENT)
+		_accept_button.disabled = true
+		_reject_button.disabled = true
+		return
 	ticket_expired.emit(_data.id_ticket)
 	queue_free()
 
@@ -212,37 +292,13 @@ func _on_decision_timer_timeout() -> void:
 func _on_process_timer_timeout() -> void:
 	if state != State.IN_PROGRESS:
 		return
-	# Se acabó el tiempo de cumplimiento (120 s): aquí es cuando de verdad se le
-	# pregunta al servidor si se entregó lo solicitado. Antes, nada se da por hecho.
-	if Session.jwt_token.is_empty() or _data.id_ticket <= 0:
-		# Sin sesión, o ticket del generador local (id negativo, no existe en la
-		# base de datos): no hay nada que preguntarle al servidor. Resultado simulado.
-		push_warning("[TicketCard] Ticket %d sin respaldo en el servidor, resultado SIMULADO" % _data.id_ticket)
-		_finish(true, 0.0, 0.0)
+	if _modo_servidor():
+		# La entrega la decide el servidor (¿sigue habiendo capacidad?); aquí solo se espera.
+		_process_label.text = "Entregando..."
 		return
-
-	var url := Session.base_url + RESOLVER_ENDPOINT
-	var body := JSON.stringify({"id_ticket": _data.id_ticket})
-	_resolve_request.request(url, Session.auth_headers(), HTTPClient.METHOD_POST, body)
-
-
-func _on_resolve_completed(_result: int, response_code: int, _headers: PackedStringArray, body: PackedByteArray) -> void:
-	if response_code != 200:
-		push_warning("[TicketCard] Error %d al resolver el ticket %d" % [response_code, _data.id_ticket])
-		_finish(false, 0.0, 0.0, "ERROR %d" % response_code)
-		return
-
-	var json = JSON.parse_string(body.get_string_from_utf8())
-	if json == null:
-		push_warning("[TicketCard] Respuesta inválida al resolver el ticket %d" % _data.id_ticket)
-		_finish(false, 0.0, 0.0, "ERROR")
-		return
-
-	_finish(
-		bool(json.get("exito", false)),
-		float(json.get("creditosActuales", 0.0)),
-		float(json.get("reputacionActual", 0.0))
-	)
+	# Simulación sin sesión: resultado local.
+	push_warning("[TicketCard] Ticket %d sin respaldo en el servidor, resultado SIMULADO" % _data.id_ticket)
+	_finish(true, 0.0, 0.0)
 
 
 ## Deja la tarjeta en su estado final (colapsada, con el resultado a la vista)

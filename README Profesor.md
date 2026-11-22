@@ -54,11 +54,11 @@ docker compose ps           # ct-mysql y ct-api deben decir "healthy"
 
 Comprueba en el navegador: `http://127.0.0.1:3000/api/health`
 
-> Si tu base local se creó **antes** de las migraciones, ejecútalas una vez
-> (ver `database/migrations/` en el backend):
+> Si tu base local se creó **antes** de alguna migración (`database/migrations/`
+> del backend), aplícalas todas con este comando desde la carpeta del backend.
+> Las que ya estaban aplicadas responden `Duplicate column name ...`: es normal.
 > ```powershell
-> Get-Content database\migrations\001_inventario_estado_y_ubicacion.sql | docker exec -i ct-mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" --default-character-set=utf8mb4 cyber_tycoon'
-> Get-Content database\migrations\002_reparar_acentos_catalogo.sql | docker exec -i ct-mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" --default-character-set=utf8mb4 cyber_tycoon'
+> foreach ($f in Get-ChildItem database\migrations\*.sql) { "== $($f.Name)"; docker cp $f.FullName ct-mysql:/tmp/migracion.sql; docker exec ct-mysql sh -c 'mysql -uroot -p$MYSQL_ROOT_PASSWORD --default-character-set=utf8mb4 cyber_tycoon < /tmp/migracion.sql' }
 > ```
 
 ### 2. Apuntar el juego a tu computadora

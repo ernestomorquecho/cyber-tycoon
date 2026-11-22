@@ -35,6 +35,8 @@ const TEMPERATURA_ESCALA := 100.0 # tope visual de la barra de temperatura
 
 var _rack_nodes: Dictionary = {} # id_rack (int) -> instancia de Rack
 var _bar_labels: Dictionary = {} # ProgressBar -> Label con el valor y su unidad
+var _game_over_modal: GameOverModal = null
+var _globo_tickets: Label # cuántas solicitudes esperan respuesta
 
 
 func _ready() -> void:
@@ -55,6 +57,8 @@ func _ready() -> void:
 	for bar in [_temp_bar, _watts_bar, _memory_bar, _teraflops_bar]:
 		_preparar_barra(bar)
 
+	_crear_globo_tickets()
+
 	_rack_container.alignment = BoxContainer.ALIGNMENT_CENTER
 	_rack_container.add_theme_constant_override("separation", 35)
 
@@ -66,6 +70,46 @@ func _ready() -> void:
 	if GameData.estado_recibido:
 		_aplicar_estado()
 	GameData.solicitar_dashboard()
+
+
+## Con GAME_OVER el servidor ya bloquea compras/tickets/equipos; aquí solo se
+## cierra lo que esté abierto, se desactiva la navegación y se muestra el modal.
+func _actualizar_game_over() -> void:
+	var terminada := GameData.es_game_over()
+	for boton in [_inventario_button, _tienda_button, _tickets_button]:
+		boton.disabled = terminada
+		boton.modulate = Color(0.4, 0.4, 0.4) if terminada else Color.WHITE
+
+	if terminada:
+		if _game_over_modal == null:
+			for child in _overlay_layer.get_children():
+				child.queue_free()
+			_game_over_modal = GameOverModal.new()
+			_game_over_modal.salir_solicitado.connect(_on_salir_pressed)
+			add_child(_game_over_modal) # último hijo = encima de todo
+		_game_over_modal.actualizar()
+	elif _game_over_modal != null:
+		_game_over_modal.queue_free()
+		_game_over_modal = null
+
+
+## Globo rojo con el número de solicitudes pendientes sobre el botón de Tickets
+## (los tickets llegan y expiran aunque esa pantalla esté cerrada).
+func _crear_globo_tickets() -> void:
+	_globo_tickets = Label.new()
+	_globo_tickets.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_globo_tickets.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_globo_tickets.custom_minimum_size = Vector2(34, 34)
+	_globo_tickets.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_globo_tickets.add_theme_color_override("font_color", Color.WHITE)
+	var fondo := StyleBoxFlat.new()
+	fondo.bg_color = Color(0.9, 0.15, 0.2)
+	fondo.set_corner_radius_all(17)
+	_globo_tickets.add_theme_stylebox_override("normal", fondo)
+	_globo_tickets.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	_globo_tickets.position += Vector2(-6, 4)
+	_globo_tickets.visible = false
+	_tickets_button.add_child(_globo_tickets)
 
 
 ## Salir: cierra la sesión y vuelve al Login.
@@ -122,18 +166,23 @@ func _pintar_barra(bar: ProgressBar, valor: float, maximo: float, texto: String)
 
 
 func _aplicar_estado() -> void:
-	_credits_label.text = "Créditos: $%s" % _formato_miles(GameData.creditos)
+	_credits_label.text = "Créditos: $%s     Reputación: %d/100" % [
+		_formato_miles(GameData.creditos), GameData.reputacion]
+	_actualizar_game_over()
+	_globo_tickets.text = str(GameData.tickets_pendientes)
+	_globo_tickets.visible = GameData.tickets_pendientes > 0 and not GameData.es_game_over()
 
 	_pintar_barra(_temp_bar, GameData.temperatura, TEMPERATURA_ESCALA,
 		"%d °C" % roundi(GameData.temperatura))
 	_pintar_barra(_watts_bar, GameData.carga_electrica, GameData.capacidad_watts,
 		"%d / %d W" % [roundi(GameData.carga_electrica), roundi(GameData.capacidad_watts)])
-	# TODO: cuando los tickets aceptados reserven RAM/TFLOPS, estas dos barras
-	# mostrarán "en uso / total". Por ahora el servidor solo reporta el total.
-	_pintar_barra(_memory_bar, GameData.memoria, GameData.memoria,
-		"%d GB" % roundi(GameData.memoria))
-	_pintar_barra(_teraflops_bar, GameData.teraflops, GameData.teraflops,
-		"%d TFLOPS" % roundi(GameData.teraflops))
+	# RAM y TFLOPS: lo que apartan los tickets en proceso sobre el total instalado.
+	var ram_uso := float(GameData.reservado.get("memoria", 0))
+	var tf_uso := float(GameData.reservado.get("teraflops", 0))
+	_pintar_barra(_memory_bar, ram_uso, GameData.memoria,
+		"%d / %d GB en uso" % [roundi(ram_uso), roundi(GameData.memoria)])
+	_pintar_barra(_teraflops_bar, tf_uso, GameData.teraflops,
+		"%d / %d TFLOPS en uso" % [roundi(tf_uso), roundi(GameData.teraflops)])
 
 	var en_alerta := GameData.temperatura > TEMPERATURA_ALERTA
 	for rack_json in GameData.racks:
