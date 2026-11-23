@@ -1,12 +1,13 @@
 [gd_scene format=3 uid="uid://dt4f3s4aioihg"]
 
 [ext_resource type="Script" uid="uid://bvbmbofh272ku" path="res://Scripts/Dashboard.gd" id="1"]
+[ext_resource type="Texture2D" uid="uid://ce3f751ws8532" path="res://Assets/Dashboard/fondoDash.jpg" id="2_5lahn"]
 [ext_resource type="Texture2D" uid="uid://vrssfufhfuwa" path="res://Assets/Dashboard/Inventario.png" id="2_egtny"]
 [ext_resource type="Texture2D" uid="uid://yv6ly6iooblj" path="res://Assets/Dashboard/Atras.png" id="3_5lahn"]
 [ext_resource type="Texture2D" uid="uid://yp08l87wwww1" path="res://Assets/Dashboard/Tienda.png" id="3_dkrxe"]
 [ext_resource type="Texture2D" uid="uid://my4u7wu1rktf" path="res://Assets/Dashboard/Tickets.png" id="4_5lahn"]
 
-[node name="Dashboard" type="Control" unique_id=1219129780]
+[node name="Dashboard" type="Control" unique_id=1219129780 node_paths=PackedStringArray("boton_silencio")]
 layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
@@ -14,8 +15,22 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1")
+boton_silencio = NodePath("TopBar/Button")
+
+[node name="TextureRect" type="TextureRect" parent="." unique_id=1742425500]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_5lahn")
+expand_mode = 1
+stretch_mode = 6
 
 [node name="Background" type="ColorRect" parent="." unique_id=139029221]
+visible = false
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -31,6 +46,10 @@ anchor_right = 1.0
 offset_bottom = 50.0
 grow_horizontal = 2
 theme_override_constants/separation = 12
+
+[node name="Button" type="Button" parent="TopBar" unique_id=1095186692]
+layout_mode = 2
+text = "Música: ON"
 
 [node name="Spacer" type="Control" parent="TopBar" unique_id=1613227025]
 layout_mode = 2

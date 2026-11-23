@@ -1,0 +1,8 @@
+[gd_scene format=3 uid="uid://dc4fg0dtwt652"]
+
+[ext_resource type="AudioStream" uid="uid://dqj5jr06bocdo" path="res://Assets/music/soundtrack.mp3" id="1_cl6bf"]
+
+[node name="MusicaFondo" type="AudioStreamPlayer" unique_id=711327902]
+stream = ExtResource("1_cl6bf")
+volume_db = -10.089
+autoplay = true
