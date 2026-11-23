@@ -37,6 +37,7 @@ func _ready() -> void:
 	GameData.inventario_recibido.connect(_on_inventario_recibido)
 	GameData.inventario_error.connect(_on_inventario_error)
 	GameData.estado_actualizado.connect(_refresh_header)
+	GameData.apagado_emergencia.connect(_on_apagado_emergencia)
 
 	_limpiar_grids()
 	_refresh_header()
@@ -85,6 +86,21 @@ func _on_card_mensaje(texto: String, es_error: bool) -> void:
 		# Puede que el inventario haya cambiado en otro lado (p. ej. ya se vendió):
 		# se vuelve a pedir para que la pantalla coincida con el servidor.
 		GameData.solicitar_inventario()
+
+
+## > 85 °C: el servidor apagó otros equipos además del que se tocó. Se vuelve a
+## pedir el inventario para que todas las tarjetas muestren su estado real.
+func _on_apagado_emergencia(evento: Dictionary, tickets_fallidos: int) -> void:
+	var nombres: Array[String] = []
+	for equipo in evento.get("equipos", []):
+		if equipo is Dictionary:
+			nombres.append(str(equipo.get("nombreProducto", "equipo")))
+	var texto := "¡Apagado de emergencia a %d °C! Se apagó: %s" % [
+		roundi(float(evento.get("temperatura_antes", 0))), ", ".join(nombres)]
+	if tickets_fallidos > 0:
+		texto += ". Fallaron %d ticket(s)." % tickets_fallidos
+	_mostrar_mensaje(texto, true)
+	GameData.solicitar_inventario()
 
 
 func _grid_for_category(categoria: String) -> GridContainer:

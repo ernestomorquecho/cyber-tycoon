@@ -5,6 +5,7 @@ class_name Rack
 ## enciende tantas franjas como U ocupa (un servidor 2U = 2 franjas).
 ##   - Encendido: verde/cian parpadeando (rojo rápido si hay alerta térmica)
 ##   - Apagado:   gris tenue fijo (sigue ocupando su lugar)
+##   - Sobrecalentado: rojo oscuro fijo (lo apagó el apagado de emergencia)
 ##   - Libre:     casi negro
 
 const COLOR_OK_A := Color(0, 1, 0.25490196)   # #00FF41
@@ -12,6 +13,7 @@ const COLOR_OK_B := Color(0, 1, 1)            # #00FFFF
 const COLOR_ALERT := Color(1, 0.11764706, 0.11764706)
 const COLOR_ALERT_DIM := Color(0.3, 0, 0)
 const COLOR_OFF := Color(0.35, 0.35, 0.38)
+const COLOR_OVERHEATED := Color(0.5, 0.08, 0.05) # apagado por el apagado de emergencia
 const COLOR_EMPTY := Color(0.15, 0.15, 0.15)
 
 # Tamaño de cada franja: 14 franjas deben caber dentro del marco de rack.png.
@@ -60,24 +62,32 @@ func _rebuild_slots() -> void:
 		child.queue_free()
 	_leds_encendidos.clear()
 
-	# slot -> encendido (true/false); los slots libres no aparecen
+	# slot -> "on" | "off" | "hot" (apagado por emergencia); los slots libres no aparecen
 	var ocupacion := {}
 	for equipo in _data.equipos:
 		var inicio := int(equipo.get("slot_inicio", 0))
+		var estado := "off"
+		if bool(equipo.get("encendido", true)):
+			estado = "on"
+		elif bool(equipo.get("sobrecalentado", false)):
+			estado = "hot"
 		for i in int(equipo.get("espacio", 1)):
-			ocupacion[inicio + i] = bool(equipo.get("encendido", true))
+			ocupacion[inicio + i] = estado
 
 	for slot in range(_data.espacio_total):
 		var led := ColorRect.new()
 		led.custom_minimum_size = LED_SIZE
 		led.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		if not ocupacion.has(slot):
-			led.color = COLOR_EMPTY
-		elif ocupacion[slot]:
-			led.color = COLOR_OK_A
-			_leds_encendidos.append(led)
-		else:
-			led.color = COLOR_OFF
+		match ocupacion.get(slot, ""):
+			"":
+				led.color = COLOR_EMPTY
+			"on":
+				led.color = COLOR_OK_A
+				_leds_encendidos.append(led)
+			"hot":
+				led.color = COLOR_OVERHEATED
+			_:
+				led.color = COLOR_OFF
 		_slots_grid.add_child(led)
 
 

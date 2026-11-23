@@ -59,6 +59,9 @@ signal partida_reiniciada(exito: bool, mensaje: String)
 signal tickets_recibidos(tablero: Dictionary) # {activos, recientes, eventos}
 signal ticket_respuesta(id_ticket: int, accion: String, exito: bool, mensaje: String, ticket: Dictionary)
 signal ingreso_pasivo_cobrado(creditos: float, segundos: int) # cobro largo (p. ej. al volver a abrir el juego)
+## > 85 °C: el servidor apagó equipos. evento = {temperatura_antes, temperatura_despues,
+## equipos: [{id_inventario, nombreProducto}]}; tickets_fallidos = cuántos fallaron por eso.
+signal apagado_emergencia(evento: Dictionary, tickets_fallidos: int)
 
 var _dashboard_en_curso: bool = false
 var _tickets_en_curso: bool = false
@@ -132,7 +135,7 @@ func solicitar_dashboard() -> void:
 			if json.has("nombreUsuario"):
 				nombreUsuario = str(json["nombreUsuario"])
 			aplicar_estado(json)
-			_avisar_ingresos(json.get("eventos", []))
+			_avisar_eventos(json.get("eventos", []))
 		elif codigo != 401 and codigo != 403:
 			push_warning("[GameData] No se pudo actualizar el dashboard: %s" % _mensaje_error(codigo, json, "sin respuesta"))
 	)
@@ -180,6 +183,7 @@ func intentar_comprar(id_producto: int, _costo: float = 0.0, _espacio_necesario:
 		if codigo == 200 and json is Dictionary:
 			aplicar_estado(json.get("estado", {}))
 			compra_exitosa.emit(id_producto, str(json.get("mensaje", "¡Compra realizada!")))
+			_avisar_eventos(json.get("eventos", []))
 		else:
 			compra_fallida.emit(id_producto, _mensaje_error(codigo, json, "No se pudo completar la compra."))
 	)
@@ -202,7 +206,9 @@ func cambiar_estado_equipo(id_inventario: int, encendido: bool) -> void:
 	_api(HTTPClient.METHOD_POST, ruta, {"encendido": encendido}, func(codigo: int, json):
 		if codigo == 200 and json is Dictionary:
 			aplicar_estado(json.get("estado", {}))
-			equipo_cambiado.emit(id_inventario, true, encendido, str(json.get("mensaje", "")))
+			# "encendido" de la respuesta: el apagado de emergencia pudo apagarlo de nuevo.
+			equipo_cambiado.emit(id_inventario, true, bool(json.get("encendido", encendido)), str(json.get("mensaje", "")))
+			_avisar_eventos(json.get("eventos", []))
 		else:
 			equipo_cambiado.emit(id_inventario, false, not encendido, _mensaje_error(codigo, json, "No se pudo cambiar el equipo."))
 	)
@@ -225,7 +231,7 @@ func solicitar_tickets() -> void:
 					pendientes += 1
 			tickets_pendientes = pendientes
 			aplicar_estado(json.get("estado", {}))
-			_avisar_ingresos(json.get("eventos", []))
+			_avisar_eventos(json.get("eventos", []))
 			tickets_recibidos.emit(json)
 		elif codigo != 401 and codigo != 403:
 			push_warning("[GameData] No se pudieron cargar los tickets: %s" % _mensaje_error(codigo, json, "sin respuesta"))
@@ -252,13 +258,26 @@ func _accion_ticket(id_ticket: int, accion: String) -> void:
 	)
 
 
-## El servidor manda un evento INGRESO_PASIVO cuando cobró un rato largo de golpe.
-func _avisar_ingresos(eventos) -> void:
+## Avisos que vienen en "eventos": INGRESO_PASIVO (cobro largo de golpe) y
+## APAGADO_EMERGENCIA (> 85 °C), con los tickets que fallaron por ese apagado.
+func _avisar_eventos(eventos) -> void:
 	if not eventos is Array:
 		return
+	var emergencia: Dictionary = {}
+	var fallidos := 0
 	for ev in eventos:
-		if ev is Dictionary and str(ev.get("tipo", "")) == "INGRESO_PASIVO":
-			ingreso_pasivo_cobrado.emit(float(ev.get("creditos", 0)), int(ev.get("segundos", 0)))
+		if not ev is Dictionary:
+			continue
+		match str(ev.get("tipo", "")):
+			"INGRESO_PASIVO":
+				ingreso_pasivo_cobrado.emit(float(ev.get("creditos", 0)), int(ev.get("segundos", 0)))
+			"APAGADO_EMERGENCIA":
+				emergencia = ev
+			"FALLIDO":
+				if str(ev.get("motivo", "")) == "OVERHEATED":
+					fallidos += 1
+	if not emergencia.is_empty():
+		apagado_emergencia.emit(emergencia, fallidos)
 
 
 func es_game_over() -> bool:
@@ -283,6 +302,7 @@ func vender_equipo(id_inventario: int) -> void:
 		if codigo == 200 and json is Dictionary:
 			aplicar_estado(json.get("estado", {}))
 			equipo_vendido.emit(id_inventario, true, str(json.get("mensaje", "Equipo vendido")))
+			_avisar_eventos(json.get("eventos", []))
 		else:
 			equipo_vendido.emit(id_inventario, false, _mensaje_error(codigo, json, "No se pudo vender el equipo."))
 	)
