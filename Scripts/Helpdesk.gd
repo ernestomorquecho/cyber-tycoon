@@ -323,18 +323,20 @@ func _on_ticket_rejected(id_ticket: int, card: TicketCard) -> void:
 		_cards_por_id.erase(id_ticket)
 		displayed_reputation = GameData.reputacion # ya la descontó el servidor
 	else:
-		_change_reputation(-5)
+		_change_reputation(-RequestCatalog.REJECT_PENALTY)
 	_release_requester(card, "rechazada")
-	_push_notification("Rechazaste: %s (-5 de reputación)" % card.get_title())
+	_push_notification("Rechazaste: %s (-%d de reputación)" % [card.get_title(), RequestCatalog.REJECT_PENALTY])
 
 
+## Solo en modo simulación: con servidor, la tarjeta no emite ticket_expired
+## (el backend lo marca EXPIRADO y lo quita en la siguiente consulta).
 func _on_ticket_expired(id_ticket: int, card: TicketCard) -> void:
-	print("[Helpdesk] Ticket caducado (-20 reputación, SOLO VISUAL, falta endpoint real): ", id_ticket)
-	_change_reputation(-20)
+	print("[Helpdesk] Ticket caducado en la simulación (-%d reputación): %d" % [RequestCatalog.REJECT_PENALTY, id_ticket])
+	_change_reputation(-RequestCatalog.REJECT_PENALTY)
 	# Una solicitud que caduca también libera al solicitante; si no, se quedaría
 	# bloqueado para siempre (nadie la completará ni la rechazará).
 	_release_requester(card, "caducada")
-	_push_notification("Caducó sin respuesta: %s" % card.get_title())
+	_push_notification("Caducó sin respuesta: %s (-%d de reputación)" % [card.get_title(), RequestCatalog.REJECT_PENALTY])
 
 
 func _on_ticket_resolved(id_ticket: int, exito: bool, creditos_actuales: float, reputacion_actual: float, card: TicketCard) -> void:
@@ -357,11 +359,11 @@ func _on_ticket_resolved(id_ticket: int, exito: bool, creditos_actuales: float, 
 	_push_notification("%s: %s" % [card.get_title(), card.result_text])
 
 
-## Suma o resta reputación (nunca baja de 0) y avisa cuando se cruza un umbral
+## Suma o resta reputación (siempre en [0, 100], como el servidor) y avisa cuando se cruza un umbral
 ## que desbloquea (o vuelve a bloquear) solicitudes medias o difíciles.
 func _change_reputation(delta: int) -> void:
 	var before := RequestCatalog.unlocked_count(displayed_reputation)
-	displayed_reputation = maxi(0, displayed_reputation + delta)
+	displayed_reputation = clampi(displayed_reputation + delta, RequestCatalog.REPUTATION_MIN, RequestCatalog.REPUTATION_MAX)
 	var after := RequestCatalog.unlocked_count(displayed_reputation)
 	print("[Reputacion] %+d -> %d (los clientes pueden pedir %d de %d solicitudes)" % [delta, displayed_reputation, after, RequestCatalog.CATALOG_SIZE])
 	if after > before:
@@ -515,8 +517,8 @@ func _spawn_mock_tickets_for_testing() -> void:
 	ddos.memoriaRequerida = 8.0
 	ddos.recompensa_creditos = 150.0
 	ddos.penalizacion_creditos = 50.0
-	ddos.recompensa_reputacion = 15
-	ddos.penalizacion_reputacion = 20
+	ddos.recompensa_reputacion = 6 # escala 0-100, como una solicitud media
+	ddos.penalizacion_reputacion = 9
 	ddos.decision_time_seconds = 15.0
 	ddos.tiempo_para_completado = 20
 	_spawn_ticket(ddos)
@@ -529,8 +531,8 @@ func _spawn_mock_tickets_for_testing() -> void:
 	nomina.memoriaRequerida = 4.0
 	nomina.recompensa_creditos = 80.0
 	nomina.penalizacion_creditos = 30.0
-	nomina.recompensa_reputacion = 10
-	nomina.penalizacion_reputacion = 15
+	nomina.recompensa_reputacion = 3 # como una solicitud fácil
+	nomina.penalizacion_reputacion = 5
 	nomina.decision_time_seconds = 25.0
 	nomina.tiempo_para_completado = 30
 	_spawn_ticket(nomina)

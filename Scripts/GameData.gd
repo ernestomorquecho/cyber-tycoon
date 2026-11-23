@@ -62,6 +62,8 @@ signal ingreso_pasivo_cobrado(creditos: float, segundos: int) # cobro largo (p. 
 ## > 85 °C: el servidor apagó equipos. evento = {temperatura_antes, temperatura_despues,
 ## equipos: [{id_inventario, nombreProducto}]}; tickets_fallidos = cuántos fallaron por eso.
 signal apagado_emergencia(evento: Dictionary, tickets_fallidos: int)
+## Ticket entregado con el Data Center en advertencia: pagó menos (-25 %).
+signal ticket_recortado(titulo: String, creditos: float, recompensa_completa: float)
 
 var _dashboard_en_curso: bool = false
 var _tickets_en_curso: bool = false
@@ -258,8 +260,9 @@ func _accion_ticket(id_ticket: int, accion: String) -> void:
 	)
 
 
-## Avisos que vienen en "eventos": INGRESO_PASIVO (cobro largo de golpe) y
-## APAGADO_EMERGENCIA (> 85 °C), con los tickets que fallaron por ese apagado.
+## Avisos que vienen en "eventos": INGRESO_PASIVO (cobro largo de golpe),
+## APAGADO_EMERGENCIA (> 85 °C) con los tickets que fallaron por ese apagado, y
+## COMPLETADO con recorte_temperatura (entregado en advertencia, pagó menos).
 func _avisar_eventos(eventos) -> void:
 	if not eventos is Array:
 		return
@@ -276,6 +279,10 @@ func _avisar_eventos(eventos) -> void:
 			"FALLIDO":
 				if str(ev.get("motivo", "")) == "OVERHEATED":
 					fallidos += 1
+			"COMPLETADO":
+				if bool(ev.get("recorte_temperatura", false)):
+					ticket_recortado.emit(str(ev.get("titulo", "")), float(ev.get("creditos", 0)),
+						float(ev.get("recompensa_completa", 0)))
 	if not emergencia.is_empty():
 		apagado_emergencia.emit(emergencia, fallidos)
 
