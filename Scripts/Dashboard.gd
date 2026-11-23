@@ -21,6 +21,7 @@ const SEGUNDOS_AVISO_FLOTANTE := 4.0
 const SEGUNDOS_AVISO_EMERGENCIA := 7.0
 const COLOR_AVISO_NORMAL := Color(0.05, 0.35, 0.15, 0.92)
 const COLOR_AVISO_EMERGENCIA := Color(0.55, 0.05, 0.05, 0.95)
+const COLOR_AVISO_RECORTE := Color(0.6, 0.3, 0.02, 0.95)
 
 @onready var _credits_label: Label = %CreditsLabel
 
@@ -71,6 +72,7 @@ func _ready() -> void:
 	_crear_indicadores_ingreso()
 	GameData.ingreso_pasivo_cobrado.connect(_on_ingreso_pasivo_cobrado)
 	GameData.apagado_emergencia.connect(_on_apagado_emergencia)
+	GameData.ticket_recortado.connect(_on_ticket_recortado)
 
 	_rack_container.alignment = BoxContainer.ALIGNMENT_CENTER
 	_rack_container.add_theme_constant_override("separation", 35)
@@ -186,6 +188,15 @@ func _on_apagado_emergencia(evento: Dictionary, tickets_fallidos: int) -> void:
 	if tickets_fallidos > 0:
 		texto += "\n%d ticket(s) en proceso fallaron por falta de capacidad." % tickets_fallidos
 	_mostrar_aviso_flotante(texto, COLOR_AVISO_EMERGENCIA, SEGUNDOS_AVISO_EMERGENCIA)
+
+
+## Ticket entregado en zona de advertencia: el servidor pagó 25 % menos.
+func _on_ticket_recortado(titulo: String, creditos: float, recompensa_completa: float) -> void:
+	var recorte := 0
+	if recompensa_completa > 0.0:
+		recorte = roundi((1.0 - creditos / recompensa_completa) * 100.0)
+	_mostrar_aviso_flotante("Entregaste \"%s\" con el Data Center sobrecalentado:\n+$%s en vez de $%s (-%d%%)" % [
+		titulo, _formato_ingreso(creditos), _formato_ingreso(recompensa_completa), recorte], COLOR_AVISO_RECORTE)
 
 
 func _mostrar_aviso_flotante(texto: String, color_fondo: Color = COLOR_AVISO_NORMAL,
