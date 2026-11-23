@@ -50,7 +50,6 @@ func setup(data: InventoryItemData) -> void:
 	_toggle_button.set_pressed_no_signal(data.activo)
 	_update_visual_state(data.activo)
 	_reset_sell_button()
-	tooltip_text = "Rack %d, U %d" % [data.rack_numero, data.slot_inicio + 1] if data.rack_numero > 0 else ""
 
 
 ## Mismo look que TarjetaProducto: fondo oscuro, borde con el acento neón
@@ -87,9 +86,28 @@ func _texto_metrica(data: InventoryItemData) -> String:
 
 
 func _update_visual_state(activo: bool) -> void:
-	# Equipo apagado = tarjeta en gris, tal como pide el boceto.
-	modulate = Color(1, 1, 1, 1) if activo else Color(0.5, 0.5, 0.5, 1)
-	_toggle_button.text = "Encendido" if activo else "Apagado"
+	# Equipo apagado = tarjeta en gris, tal como pide el boceto. Si lo apagó el
+	# apagado de emergencia (> 85 °C) se tiñe de rojo para que se note el motivo.
+	var sobrecalentado := not activo and _data != null and _data.sobrecalentado
+	if activo:
+		modulate = Color(1, 1, 1, 1)
+		_toggle_button.text = "Encendido"
+	elif sobrecalentado:
+		modulate = Color(1, 0.45, 0.45, 1)
+		_toggle_button.text = "SOBRECALENTADO"
+	else:
+		modulate = Color(0.5, 0.5, 0.5, 1)
+		_toggle_button.text = "Apagado"
+	tooltip_text = _tooltip()
+
+
+func _tooltip() -> String:
+	if _data == null:
+		return ""
+	var texto := "Rack %d, U %d" % [_data.rack_numero, _data.slot_inicio + 1] if _data.rack_numero > 0 else ""
+	if not _data.activo and _data.sobrecalentado:
+		texto += "\nApagado de emergencia por temperatura. Mejora la refrigeración para reencenderlo."
+	return texto.strip_edges()
 
 
 func _set_ocupado(valor: bool) -> void:
@@ -112,6 +130,8 @@ func _on_equipo_cambiado(id_inventario: int, exito: bool, encendido: bool, texto
 		return
 	_set_ocupado(false)
 	# Si el servidor dijo que no (p. ej. INSUFFICIENT_POWER), el interruptor regresa.
+	if exito:
+		_data.sobrecalentado = false # el jugador lo cambió: se borra la marca
 	_data.activo = encendido
 	_toggle_button.set_pressed_no_signal(encendido)
 	_update_visual_state(encendido)

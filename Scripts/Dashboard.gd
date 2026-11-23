@@ -13,8 +13,15 @@ const InventarioScene: PackedScene = preload("res://Escenas/Inventario.tscn")
 const RackScene: PackedScene = preload("res://Escenas/Dashboard/Rack.tscn")
 
 const POLL_INTERVAL_SECONDS := 5.0
-const TEMPERATURA_ALERTA := 85.0  # > 85 °C = zona crítica (CLAUDE.md §5); solo visual
 const TEMPERATURA_ESCALA := 100.0 # tope visual de la barra de temperatura
+const COLOR_TEMP_ADVERTENCIA := Color(1.0, 0.12, 0.12)  # barra en zona de advertencia (status WARNING)
+const COLOR_INGRESO_NORMAL := Color(0.45, 1.0, 0.5)
+const COLOR_INGRESO_RECORTADO := Color(1.0, 0.65, 0.2)
+const SEGUNDOS_AVISO_FLOTANTE := 4.0
+const SEGUNDOS_AVISO_EMERGENCIA := 7.0
+const COLOR_AVISO_NORMAL := Color(0.05, 0.35, 0.15, 0.92)
+const COLOR_AVISO_EMERGENCIA := Color(0.55, 0.05, 0.05, 0.95)
+const COLOR_AVISO_RECORTE := Color(0.6, 0.3, 0.02, 0.95)
 
 @onready var _credits_label: Label = %CreditsLabel
 
@@ -39,6 +46,9 @@ var _rack_nodes: Dictionary = {} # id_rack (int) -> instancia de Rack
 var _bar_labels: Dictionary = {} # ProgressBar -> Label con el valor y su unidad
 var _game_over_modal: GameOverModal = null
 var _globo_tickets: Label # cuántas solicitudes esperan respuesta
+var _ingreso_label: Label # "+$X/min" junto a los créditos
+var _aviso_temp: Label    # aviso de thermal throttling debajo de la barra de temperatura
+var _color_temp_normal: Color
 
 
 func _ready() -> void:
@@ -59,7 +69,12 @@ func _ready() -> void:
 	for bar in [_temp_bar, _watts_bar, _memory_bar, _teraflops_bar]:
 		_preparar_barra(bar)
 
+	_color_temp_normal = _temp_bar.self_modulate
 	_crear_globo_tickets()
+	_crear_indicadores_ingreso()
+	GameData.ingreso_pasivo_cobrado.connect(_on_ingreso_pasivo_cobrado)
+	GameData.apagado_emergencia.connect(_on_apagado_emergencia)
+	GameData.ticket_recortado.connect(_on_ticket_recortado)
 
 	_rack_container.alignment = BoxContainer.ALIGNMENT_CENTER
 	_rack_container.add_theme_constant_override("separation", 35)
@@ -119,6 +134,102 @@ func _crear_globo_tickets() -> void:
 	_tickets_button.add_child(_globo_tickets)
 
 
+## Ingreso pasivo junto a los créditos y aviso de temperatura bajo su barra
+## (creados por código para no tocar el Inspector).
+func _crear_indicadores_ingreso() -> void:
+	_ingreso_label = Label.new()
+	_ingreso_label.add_theme_color_override("font_color", COLOR_INGRESO_NORMAL)
+	_ingreso_label.add_theme_color_override("font_outline_color", Color.BLACK)
+	_ingreso_label.add_theme_constant_override("outline_size", 4)
+	_ingreso_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var barra_superior := _credits_label.get_parent()
+	barra_superior.add_child(_ingreso_label)
+	barra_superior.move_child(_ingreso_label, _credits_label.get_index() + 1)
+
+	_aviso_temp = Label.new()
+	_aviso_temp.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_aviso_temp.add_theme_color_override("font_color", Color(1.0, 0.35, 0.3))
+	_aviso_temp.add_theme_color_override("font_outline_color", Color.BLACK)
+	_aviso_temp.add_theme_constant_override("outline_size", 4)
+	_aviso_temp.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_aviso_temp.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_aviso_temp.visible = false
+	var columna_temp := _temp_bar.get_parent()
+	columna_temp.add_child(_aviso_temp)
+	columna_temp.move_child(_aviso_temp, _temp_bar.get_index() + 1)
+
+
+func _actualizar_ingresos() -> void:
+	# CRITICAL casi nunca llega (el servidor apaga equipos en la misma petición),
+	# pero si llega se pinta igual que la advertencia.
+	var advertencia := GameData.status_temperatura in ["WARNING", "CRITICAL"]
+	_temp_bar.self_modulate = COLOR_TEMP_ADVERTENCIA if advertencia else _color_temp_normal
+
+	_ingreso_label.text = "   +$%s/min" % _formato_ingreso(GameData.ingreso_por_minuto)
+	_ingreso_label.add_theme_color_override("font_color",
+		COLOR_INGRESO_RECORTADO if advertencia else COLOR_INGRESO_NORMAL)
+
+	_aviso_temp.visible = advertencia and not GameData.es_game_over()
+	if advertencia:
+		if GameData.ingreso_base_por_minuto > 0.0:
+			var recorte := roundi((1.0 - GameData.ingreso_por_minuto / GameData.ingreso_base_por_minuto) * 100.0)
+			_aviso_temp.text = "¡Sobrecalentamiento! Ingresos -%d%%. Mejora la refrigeración." % recorte
+		else:
+			_aviso_temp.text = "¡Sobrecalentamiento! Mejora la refrigeración."
+
+
+## Al volver al juego tras un rato: "Mientras no estabas ganaste $X".
+func _on_ingreso_pasivo_cobrado(creditos: float, segundos: int) -> void:
+	var minutos := maxi(1, roundi(segundos / 60.0))
+	_mostrar_aviso_flotante("Ingresos pasivos: +$%s en %d min" % [_formato_ingreso(creditos), minutos])
+
+
+## > 85 °C: el servidor apagó equipos (y pudieron fallar tickets en proceso).
+func _on_apagado_emergencia(evento: Dictionary, tickets_fallidos: int) -> void:
+	var nombres: Array[String] = []
+	for equipo in evento.get("equipos", []):
+		if equipo is Dictionary:
+			nombres.append(str(equipo.get("nombreProducto", "equipo")))
+	var texto := "¡APAGADO DE EMERGENCIA! El Data Center llegó a %d °C.\nSe apagó: %s" % [
+		roundi(float(evento.get("temperatura_antes", 0))), ", ".join(nombres)]
+	if tickets_fallidos > 0:
+		texto += "\n%d ticket(s) en proceso fallaron por falta de capacidad." % tickets_fallidos
+	_mostrar_aviso_flotante(texto, COLOR_AVISO_EMERGENCIA, SEGUNDOS_AVISO_EMERGENCIA)
+
+
+## Ticket entregado en zona de advertencia: el servidor pagó 25 % menos.
+func _on_ticket_recortado(titulo: String, creditos: float, recompensa_completa: float) -> void:
+	var recorte := 0
+	if recompensa_completa > 0.0:
+		recorte = roundi((1.0 - creditos / recompensa_completa) * 100.0)
+	_mostrar_aviso_flotante("Entregaste \"%s\" con el Data Center sobrecalentado:\n+$%s en vez de $%s (-%d%%)" % [
+		titulo, _formato_ingreso(creditos), _formato_ingreso(recompensa_completa), recorte], COLOR_AVISO_RECORTE)
+
+
+func _mostrar_aviso_flotante(texto: String, color_fondo: Color = COLOR_AVISO_NORMAL,
+		segundos: float = SEGUNDOS_AVISO_FLOTANTE) -> void:
+	if GameData.es_game_over():
+		return
+	var aviso := Label.new()
+	aviso.text = texto
+	aviso.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	aviso.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	aviso.add_theme_color_override("font_color", Color.WHITE)
+	var fondo := StyleBoxFlat.new()
+	fondo.bg_color = color_fondo
+	fondo.set_corner_radius_all(10)
+	fondo.set_content_margin_all(12)
+	aviso.add_theme_stylebox_override("normal", fondo)
+	aviso.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+	aviso.grow_horizontal = Control.GROW_DIRECTION_BOTH
+	aviso.position.y = 70
+	add_child(aviso)
+	var tween := aviso.create_tween()
+	tween.tween_interval(segundos)
+	tween.tween_property(aviso, "modulate:a", 0.0, 0.6)
+	tween.tween_callback(aviso.queue_free)
+
+
 ## Salir: cierra la sesión y vuelve al Login.
 func _on_salir_pressed() -> void:
 	GameData.cerrar_sesion()
@@ -176,6 +287,7 @@ func _aplicar_estado() -> void:
 	_credits_label.text = "Créditos: $%s     Reputación: %d/100" % [
 		_formato_miles(GameData.creditos), GameData.reputacion]
 	_actualizar_game_over()
+	_actualizar_ingresos()
 	_globo_tickets.text = str(GameData.tickets_pendientes)
 	_globo_tickets.visible = GameData.tickets_pendientes > 0 and not GameData.es_game_over()
 
@@ -191,7 +303,9 @@ func _aplicar_estado() -> void:
 	_pintar_barra(_teraflops_bar, tf_uso, GameData.teraflops,
 		"%d / %d TFLOPS en uso" % [roundi(tf_uso), roundi(GameData.teraflops)])
 
-	var en_alerta := GameData.temperatura > TEMPERATURA_ALERTA
+	# Arriba de 85 °C el servidor apaga equipos en la misma petición, así que la
+	# alerta del rack (parpadeo rojo) se usa para la zona de advertencia.
+	var en_alerta := GameData.status_temperatura in ["WARNING", "CRITICAL"]
 	for rack_json in GameData.racks:
 		_ensure_rack(rack_json, en_alerta)
 
@@ -210,6 +324,13 @@ func _ensure_rack(rack_json: Dictionary, en_alerta: bool) -> void:
 
 	rack.setup(data)
 	rack.set_alert(en_alerta)
+
+
+## 8 -> "8", 154.8 -> "154.8", 1548 -> "1,548"
+static func _formato_ingreso(valor: float) -> String:
+	if is_equal_approx(valor, roundf(valor)) or absf(valor) >= 1000.0:
+		return _formato_miles(valor)
+	return "%.1f" % valor
 
 
 static func _formato_miles(valor: float) -> String:

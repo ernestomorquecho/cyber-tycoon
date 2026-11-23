@@ -27,6 +27,11 @@ var estadisticas: Dictionary = {} # contratos_finalizados, ataques_resueltos, eq
 # Capacidad apartada por tickets en proceso: {teraflops, memoria, ancho_banda}
 var reservado: Dictionary = {"teraflops": 0, "memoria": 0, "ancho_banda": 0}
 var tickets_pendientes: int = 0 # solicitudes esperando respuesta (globo del botón Tickets)
+# Ingresos pasivos y zona de temperatura (los calcula el servidor, CLAUDE.md §5)
+var ingreso_por_minuto: float = 0.0       # ya con el recorte por temperatura
+var ingreso_base_por_minuto: float = 0.0  # sin recorte
+var status_temperatura: String = "OK"     # "OK" | "WARNING"
+var warning: String = ""                  # "HIGH_TEMPERATURE" o vacío
 var estado_recibido: bool = false # false hasta la primera respuesta del servidor
 
 # Token JWT: la única fuente de verdad es Session.jwt_token (la usan también
@@ -53,6 +58,12 @@ signal equipo_vendido(id_inventario: int, exito: bool, mensaje: String)
 signal partida_reiniciada(exito: bool, mensaje: String)
 signal tickets_recibidos(tablero: Dictionary) # {activos, recientes, eventos}
 signal ticket_respuesta(id_ticket: int, accion: String, exito: bool, mensaje: String, ticket: Dictionary)
+signal ingreso_pasivo_cobrado(creditos: float, segundos: int) # cobro largo (p. ej. al volver a abrir el juego)
+## > 85 °C: el servidor apagó equipos. evento = {temperatura_antes, temperatura_despues,
+## equipos: [{id_inventario, nombreProducto}]}; tickets_fallidos = cuántos fallaron por eso.
+signal apagado_emergencia(evento: Dictionary, tickets_fallidos: int)
+## Ticket entregado con el Data Center en advertencia: pagó menos (-25 %).
+signal ticket_recortado(titulo: String, creditos: float, recompensa_completa: float)
 
 var _dashboard_en_curso: bool = false
 var _tickets_en_curso: bool = false
@@ -102,6 +113,11 @@ func aplicar_estado(estado: Dictionary) -> void:
 	capacidad_watts = float(m.get("capacidad_watts", capacidad_watts))
 	espacio_ocupado = int(m.get("espacio_usado", espacio_ocupado))
 	espacio_total = int(m.get("espacio_total", espacio_total))
+	ingreso_por_minuto = float(m.get("ingreso_por_minuto", ingreso_por_minuto))
+	ingreso_base_por_minuto = float(m.get("ingreso_base_por_minuto", ingreso_base_por_minuto))
+	status_temperatura = str(m.get("status", status_temperatura))
+	var aviso = m.get("warning", warning)
+	warning = "" if aviso == null else str(aviso)
 	racks = estado.get("racks", racks)
 	estado_recibido = true
 
@@ -121,6 +137,7 @@ func solicitar_dashboard() -> void:
 			if json.has("nombreUsuario"):
 				nombreUsuario = str(json["nombreUsuario"])
 			aplicar_estado(json)
+			_avisar_eventos(json.get("eventos", []))
 		elif codigo != 401 and codigo != 403:
 			push_warning("[GameData] No se pudo actualizar el dashboard: %s" % _mensaje_error(codigo, json, "sin respuesta"))
 	)
@@ -168,6 +185,7 @@ func intentar_comprar(id_producto: int, _costo: float = 0.0, _espacio_necesario:
 		if codigo == 200 and json is Dictionary:
 			aplicar_estado(json.get("estado", {}))
 			compra_exitosa.emit(id_producto, str(json.get("mensaje", "¡Compra realizada!")))
+			_avisar_eventos(json.get("eventos", []))
 		else:
 			compra_fallida.emit(id_producto, _mensaje_error(codigo, json, "No se pudo completar la compra."))
 	)
@@ -190,7 +208,9 @@ func cambiar_estado_equipo(id_inventario: int, encendido: bool) -> void:
 	_api(HTTPClient.METHOD_POST, ruta, {"encendido": encendido}, func(codigo: int, json):
 		if codigo == 200 and json is Dictionary:
 			aplicar_estado(json.get("estado", {}))
-			equipo_cambiado.emit(id_inventario, true, encendido, str(json.get("mensaje", "")))
+			# "encendido" de la respuesta: el apagado de emergencia pudo apagarlo de nuevo.
+			equipo_cambiado.emit(id_inventario, true, bool(json.get("encendido", encendido)), str(json.get("mensaje", "")))
+			_avisar_eventos(json.get("eventos", []))
 		else:
 			equipo_cambiado.emit(id_inventario, false, not encendido, _mensaje_error(codigo, json, "No se pudo cambiar el equipo."))
 	)
@@ -213,6 +233,7 @@ func solicitar_tickets() -> void:
 					pendientes += 1
 			tickets_pendientes = pendientes
 			aplicar_estado(json.get("estado", {}))
+			_avisar_eventos(json.get("eventos", []))
 			tickets_recibidos.emit(json)
 		elif codigo != 401 and codigo != 403:
 			push_warning("[GameData] No se pudieron cargar los tickets: %s" % _mensaje_error(codigo, json, "sin respuesta"))
@@ -239,6 +260,33 @@ func _accion_ticket(id_ticket: int, accion: String) -> void:
 	)
 
 
+## Avisos que vienen en "eventos": INGRESO_PASIVO (cobro largo de golpe),
+## APAGADO_EMERGENCIA (> 85 °C) con los tickets que fallaron por ese apagado, y
+## COMPLETADO con recorte_temperatura (entregado en advertencia, pagó menos).
+func _avisar_eventos(eventos) -> void:
+	if not eventos is Array:
+		return
+	var emergencia: Dictionary = {}
+	var fallidos := 0
+	for ev in eventos:
+		if not ev is Dictionary:
+			continue
+		match str(ev.get("tipo", "")):
+			"INGRESO_PASIVO":
+				ingreso_pasivo_cobrado.emit(float(ev.get("creditos", 0)), int(ev.get("segundos", 0)))
+			"APAGADO_EMERGENCIA":
+				emergencia = ev
+			"FALLIDO":
+				if str(ev.get("motivo", "")) == "OVERHEATED":
+					fallidos += 1
+			"COMPLETADO":
+				if bool(ev.get("recorte_temperatura", false)):
+					ticket_recortado.emit(str(ev.get("titulo", "")), float(ev.get("creditos", 0)),
+						float(ev.get("recompensa_completa", 0)))
+	if not emergencia.is_empty():
+		apagado_emergencia.emit(emergencia, fallidos)
+
+
 func es_game_over() -> bool:
 	return estado_partida == "GAME_OVER"
 
@@ -261,6 +309,7 @@ func vender_equipo(id_inventario: int) -> void:
 		if codigo == 200 and json is Dictionary:
 			aplicar_estado(json.get("estado", {}))
 			equipo_vendido.emit(id_inventario, true, str(json.get("mensaje", "Equipo vendido")))
+			_avisar_eventos(json.get("eventos", []))
 		else:
 			equipo_vendido.emit(id_inventario, false, _mensaje_error(codigo, json, "No se pudo vender el equipo."))
 	)
