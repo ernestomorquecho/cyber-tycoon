@@ -9,6 +9,11 @@ class_name InventoryItemCard
 signal mensaje(texto: String, es_error: bool)
 
 const CONFIRMAR_SEGUNDOS := 3.0
+const Estilo := preload("res://Scripts/EstiloTienda.gd")
+
+## Grupo de categoría (servidores, refrigeracion, energia, redes, otros),
+## el mismo que usa la Tienda; el Inventario filtra sus pestañas con él.
+var grupo: String = "otros"
 
 var _data: InventoryItemData
 var _sell_button: Button
@@ -28,6 +33,7 @@ func _ready() -> void:
 	_sell_button.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	_sell_button.pressed.connect(_on_sell_pressed)
 	_toggle_button.get_parent().add_child(_sell_button)
+	_toggle_button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 
 	GameData.equipo_cambiado.connect(_on_equipo_cambiado)
 	GameData.equipo_vendido.connect(_on_equipo_vendido)
@@ -35,6 +41,8 @@ func _ready() -> void:
 
 func setup(data: InventoryItemData) -> void:
 	_data = data
+	grupo = Estilo.grupo_de({"categoria": data.categoria})
+	_aplicar_estilo()
 	_name_label.text = data.nombre_producto
 	if data.icon:
 		_icon_rect.texture = data.icon
@@ -42,6 +50,24 @@ func setup(data: InventoryItemData) -> void:
 	_toggle_button.set_pressed_no_signal(data.activo)
 	_update_visual_state(data.activo)
 	_reset_sell_button()
+
+
+## Mismo look que TarjetaProducto: fondo oscuro, borde con el acento neón
+## de la categoría y botón VENDER en color dinero.
+func _aplicar_estilo() -> void:
+	var acento := Estilo.color_de(grupo)
+	add_theme_stylebox_override("panel", Estilo.caja(Estilo.FONDO_TARJETA, acento.darkened(0.35), 2))
+	size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_name_label.add_theme_color_override("font_color", Estilo.TEXTO)
+	_name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_name_label.custom_minimum_size.y = 40
+	_name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_metric_label.add_theme_color_override("font_color", acento)
+	_toggle_button.add_theme_color_override("font_color", Estilo.TEXTO_SECUNDARIO)
+	_toggle_button.add_theme_color_override("font_pressed_color", Estilo.ACENTOS["refrigeracion"])
+	_toggle_button.add_theme_color_override("font_hover_pressed_color", Estilo.ACENTOS["refrigeracion"])
+	Estilo.aplicar_boton(_sell_button, Estilo.DINERO)
+	_sell_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 
 func get_id_inventario() -> int:

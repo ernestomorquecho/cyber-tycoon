@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://2odljwj5dmke" path="res://Scripts/Helpdesk.gd" id="1"]
 [ext_resource type="Texture2D" uid="uid://5auc8faiwj6a" path="res://Assets/Tickets/inboxTickets.png" id="2"]
+[ext_resource type="Texture2D" uid="uid://ce3f751ws8532" path="res://Assets/Dashboard/fondoDash.jpg" id="2_6wop7"]
 [ext_resource type="Texture2D" uid="uid://bkvuvinctjg2o" path="res://Assets/Tickets/pendiente.png" id="3"]
 [ext_resource type="Texture2D" uid="uid://bc5d776hppvcs" path="res://Assets/Tickets/completado.png" id="4"]
 [ext_resource type="Texture2D" uid="uid://c8r7ceu4w8o1u" path="res://Assets/Tickets/notificacion_sheet.png" id="5"]
@@ -67,7 +68,20 @@ grow_horizontal = 2
 grow_vertical = 2
 script = ExtResource("1")
 
+[node name="TextureRect" type="TextureRect" parent="." unique_id=86132434]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+texture = ExtResource("2_6wop7")
+expand_mode = 1
+stretch_mode = 6
+
 [node name="Background" type="ColorRect" parent="." unique_id=1625237630]
+visible = false
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
