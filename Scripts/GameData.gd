@@ -27,6 +27,11 @@ var estadisticas: Dictionary = {} # contratos_finalizados, ataques_resueltos, eq
 # Capacidad apartada por tickets en proceso: {teraflops, memoria, ancho_banda}
 var reservado: Dictionary = {"teraflops": 0, "memoria": 0, "ancho_banda": 0}
 var tickets_pendientes: int = 0 # solicitudes esperando respuesta (globo del botón Tickets)
+# Ingresos pasivos y zona de temperatura (los calcula el servidor, CLAUDE.md §5)
+var ingreso_por_minuto: float = 0.0       # ya con el recorte por temperatura
+var ingreso_base_por_minuto: float = 0.0  # sin recorte
+var status_temperatura: String = "OK"     # "OK" | "WARNING"
+var warning: String = ""                  # "HIGH_TEMPERATURE" o vacío
 var estado_recibido: bool = false # false hasta la primera respuesta del servidor
 
 # Token JWT: la única fuente de verdad es Session.jwt_token (la usan también
@@ -53,6 +58,7 @@ signal equipo_vendido(id_inventario: int, exito: bool, mensaje: String)
 signal partida_reiniciada(exito: bool, mensaje: String)
 signal tickets_recibidos(tablero: Dictionary) # {activos, recientes, eventos}
 signal ticket_respuesta(id_ticket: int, accion: String, exito: bool, mensaje: String, ticket: Dictionary)
+signal ingreso_pasivo_cobrado(creditos: float, segundos: int) # cobro largo (p. ej. al volver a abrir el juego)
 
 var _dashboard_en_curso: bool = false
 var _tickets_en_curso: bool = false
@@ -102,6 +108,11 @@ func aplicar_estado(estado: Dictionary) -> void:
 	capacidad_watts = float(m.get("capacidad_watts", capacidad_watts))
 	espacio_ocupado = int(m.get("espacio_usado", espacio_ocupado))
 	espacio_total = int(m.get("espacio_total", espacio_total))
+	ingreso_por_minuto = float(m.get("ingreso_por_minuto", ingreso_por_minuto))
+	ingreso_base_por_minuto = float(m.get("ingreso_base_por_minuto", ingreso_base_por_minuto))
+	status_temperatura = str(m.get("status", status_temperatura))
+	var aviso = m.get("warning", warning)
+	warning = "" if aviso == null else str(aviso)
 	racks = estado.get("racks", racks)
 	estado_recibido = true
 
@@ -121,6 +132,7 @@ func solicitar_dashboard() -> void:
 			if json.has("nombreUsuario"):
 				nombreUsuario = str(json["nombreUsuario"])
 			aplicar_estado(json)
+			_avisar_ingresos(json.get("eventos", []))
 		elif codigo != 401 and codigo != 403:
 			push_warning("[GameData] No se pudo actualizar el dashboard: %s" % _mensaje_error(codigo, json, "sin respuesta"))
 	)
@@ -213,6 +225,7 @@ func solicitar_tickets() -> void:
 					pendientes += 1
 			tickets_pendientes = pendientes
 			aplicar_estado(json.get("estado", {}))
+			_avisar_ingresos(json.get("eventos", []))
 			tickets_recibidos.emit(json)
 		elif codigo != 401 and codigo != 403:
 			push_warning("[GameData] No se pudieron cargar los tickets: %s" % _mensaje_error(codigo, json, "sin respuesta"))
@@ -237,6 +250,15 @@ func _accion_ticket(id_ticket: int, accion: String) -> void:
 		else:
 			ticket_respuesta.emit(id_ticket, accion, false, _mensaje_error(codigo, json, "No se pudo %s el ticket." % accion), {})
 	)
+
+
+## El servidor manda un evento INGRESO_PASIVO cuando cobró un rato largo de golpe.
+func _avisar_ingresos(eventos) -> void:
+	if not eventos is Array:
+		return
+	for ev in eventos:
+		if ev is Dictionary and str(ev.get("tipo", "")) == "INGRESO_PASIVO":
+			ingreso_pasivo_cobrado.emit(float(ev.get("creditos", 0)), int(ev.get("segundos", 0)))
 
 
 func es_game_over() -> bool:
