@@ -13,12 +13,14 @@ const InventarioScene: PackedScene = preload("res://Escenas/Inventario.tscn")
 const RackScene: PackedScene = preload("res://Escenas/Dashboard/Rack.tscn")
 
 const POLL_INTERVAL_SECONDS := 5.0
-const TEMPERATURA_ALERTA := 85.0  # > 85 °C = zona crítica (CLAUDE.md §5); solo visual
 const TEMPERATURA_ESCALA := 100.0 # tope visual de la barra de temperatura
 const COLOR_TEMP_ADVERTENCIA := Color(1.0, 0.12, 0.12)  # barra en zona de advertencia (status WARNING)
 const COLOR_INGRESO_NORMAL := Color(0.45, 1.0, 0.5)
 const COLOR_INGRESO_RECORTADO := Color(1.0, 0.65, 0.2)
 const SEGUNDOS_AVISO_FLOTANTE := 4.0
+const SEGUNDOS_AVISO_EMERGENCIA := 7.0
+const COLOR_AVISO_NORMAL := Color(0.05, 0.35, 0.15, 0.92)
+const COLOR_AVISO_EMERGENCIA := Color(0.55, 0.05, 0.05, 0.95)
 
 @onready var _credits_label: Label = %CreditsLabel
 
@@ -68,6 +70,7 @@ func _ready() -> void:
 	_crear_globo_tickets()
 	_crear_indicadores_ingreso()
 	GameData.ingreso_pasivo_cobrado.connect(_on_ingreso_pasivo_cobrado)
+	GameData.apagado_emergencia.connect(_on_apagado_emergencia)
 
 	_rack_container.alignment = BoxContainer.ALIGNMENT_CENTER
 	_rack_container.add_theme_constant_override("separation", 35)
@@ -148,7 +151,9 @@ func _crear_indicadores_ingreso() -> void:
 
 
 func _actualizar_ingresos() -> void:
-	var advertencia := GameData.status_temperatura == "WARNING"
+	# CRITICAL casi nunca llega (el servidor apaga equipos en la misma petición),
+	# pero si llega se pinta igual que la advertencia.
+	var advertencia := GameData.status_temperatura in ["WARNING", "CRITICAL"]
 	_temp_bar.self_modulate = COLOR_TEMP_ADVERTENCIA if advertencia else _color_temp_normal
 
 	_ingreso_label.text = "   +$%s/min" % _formato_ingreso(GameData.ingreso_por_minuto)
@@ -170,7 +175,21 @@ func _on_ingreso_pasivo_cobrado(creditos: float, segundos: int) -> void:
 	_mostrar_aviso_flotante("Ingresos pasivos: +$%s en %d min" % [_formato_ingreso(creditos), minutos])
 
 
-func _mostrar_aviso_flotante(texto: String) -> void:
+## > 85 °C: el servidor apagó equipos (y pudieron fallar tickets en proceso).
+func _on_apagado_emergencia(evento: Dictionary, tickets_fallidos: int) -> void:
+	var nombres: Array[String] = []
+	for equipo in evento.get("equipos", []):
+		if equipo is Dictionary:
+			nombres.append(str(equipo.get("nombreProducto", "equipo")))
+	var texto := "¡APAGADO DE EMERGENCIA! El Data Center llegó a %d °C.\nSe apagó: %s" % [
+		roundi(float(evento.get("temperatura_antes", 0))), ", ".join(nombres)]
+	if tickets_fallidos > 0:
+		texto += "\n%d ticket(s) en proceso fallaron por falta de capacidad." % tickets_fallidos
+	_mostrar_aviso_flotante(texto, COLOR_AVISO_EMERGENCIA, SEGUNDOS_AVISO_EMERGENCIA)
+
+
+func _mostrar_aviso_flotante(texto: String, color_fondo: Color = COLOR_AVISO_NORMAL,
+		segundos: float = SEGUNDOS_AVISO_FLOTANTE) -> void:
 	if GameData.es_game_over():
 		return
 	var aviso := Label.new()
@@ -179,7 +198,7 @@ func _mostrar_aviso_flotante(texto: String) -> void:
 	aviso.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	aviso.add_theme_color_override("font_color", Color.WHITE)
 	var fondo := StyleBoxFlat.new()
-	fondo.bg_color = Color(0.05, 0.35, 0.15, 0.92)
+	fondo.bg_color = color_fondo
 	fondo.set_corner_radius_all(10)
 	fondo.set_content_margin_all(12)
 	aviso.add_theme_stylebox_override("normal", fondo)
@@ -188,7 +207,7 @@ func _mostrar_aviso_flotante(texto: String) -> void:
 	aviso.position.y = 70
 	add_child(aviso)
 	var tween := aviso.create_tween()
-	tween.tween_interval(SEGUNDOS_AVISO_FLOTANTE)
+	tween.tween_interval(segundos)
 	tween.tween_property(aviso, "modulate:a", 0.0, 0.6)
 	tween.tween_callback(aviso.queue_free)
 
@@ -266,7 +285,9 @@ func _aplicar_estado() -> void:
 	_pintar_barra(_teraflops_bar, tf_uso, GameData.teraflops,
 		"%d / %d TFLOPS en uso" % [roundi(tf_uso), roundi(GameData.teraflops)])
 
-	var en_alerta := GameData.temperatura > TEMPERATURA_ALERTA
+	# Arriba de 85 °C el servidor apaga equipos en la misma petición, así que la
+	# alerta del rack (parpadeo rojo) se usa para la zona de advertencia.
+	var en_alerta := GameData.status_temperatura in ["WARNING", "CRITICAL"]
 	for rack_json in GameData.racks:
 		_ensure_rack(rack_json, en_alerta)
 
