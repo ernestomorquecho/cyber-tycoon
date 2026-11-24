@@ -25,7 +25,10 @@ signal ticket_resolved(id_ticket: int, exito: bool, creditos_actuales: float, re
 enum State { REQUEST, IN_PROGRESS, DONE }
 
 const COLLAPSED_HEIGHT := 130.0 # alto de ticketSoli.png
-const EXPANDED_HEIGHT := 290.0  # alto de ticketConte.png
+const EXPANDED_HEIGHT := 290.0  # alto de ticketConte.png (mínimo de la tarjeta abierta)
+# Alto que cabe en la descripción sin mover nada (2 renglones). Si el texto
+# necesita más, la tarjeta crece y lo de abajo se recorre (ver _ajustar_alto).
+const ALTO_DESCRIPCION_BASE := 46.0
 const URGENT_SECONDS := 5.0
 const DESFASE_TOLERADO := 2.0   # segundos de diferencia con el servidor antes de corregir el reloj
 
@@ -42,6 +45,8 @@ var finished_with_error: bool = false
 var _data: TicketData
 var _is_expanded: bool = false
 var _esperando: bool = false # hay una petición al servidor en curso
+var _alto_extra: float = 0.0
+var _posiciones_base: Dictionary = {} # nodo -> [offset_top, offset_bottom] originales
 
 @onready var _collapsed: NinePatchRect = %Collapsed
 @onready var _expanded: NinePatchRect = %Expanded
@@ -78,6 +83,11 @@ func _ready() -> void:
 	GameData.ticket_respuesta.connect(_on_ticket_respuesta)
 
 	_process_label.visible = false
+	# Lo que va debajo de la descripción se recorre si esta necesita más renglones.
+	for nodo in [_description_label, get_node("Expanded/RewardRow"), get_node("Expanded/PenaltyRow"),
+			_requirements_label, _process_label, _accept_button, _reject_button]:
+		_posiciones_base[nodo] = [nodo.offset_top, nodo.offset_bottom]
+	_description_label.resized.connect(_ajustar_alto)
 	_set_expanded(false)
 
 
@@ -100,6 +110,7 @@ func setup(data: TicketData) -> void:
 
 	_decision_timer.start(maxf(0.1, data.decision_time_seconds))
 	_update_labels()
+	_ajustar_alto.call_deferred()
 
 
 func _modo_servidor() -> bool:
@@ -172,7 +183,34 @@ func _set_expanded(value: bool) -> void:
 	_is_expanded = value
 	_collapsed.visible = not value
 	_expanded.visible = value
-	custom_minimum_size.y = EXPANDED_HEIGHT if value else COLLAPSED_HEIGHT
+	custom_minimum_size.y = EXPANDED_HEIGHT + _alto_extra if value else COLLAPSED_HEIGHT
+	if value:
+		_ajustar_alto.call_deferred()
+
+
+## Si la descripción no cabe en 2 renglones, la tarjeta abierta crece lo necesario
+## y las filas de recompensa, requisitos y botones se recorren hacia abajo. El
+## fondo (ticketConte.png) solo estira la franja lisa entre el avatar y la línea
+## de "Requiere" (patch_margin_top/bottom en TicketCard.tscn).
+func _ajustar_alto() -> void:
+	if _description_label.size.x <= 0.0:
+		return
+	var renglones := _description_label.get_line_count()
+	var interlineado := float(_description_label.get_theme_constant("line_spacing"))
+	var alto_texto := renglones * (_description_label.get_line_height() + interlineado)
+	var extra := maxf(0.0, ceilf(alto_texto - ALTO_DESCRIPCION_BASE))
+	if is_equal_approx(extra, _alto_extra):
+		return
+	_alto_extra = extra
+	for nodo in _posiciones_base:
+		var base: Array = _posiciones_base[nodo]
+		if nodo == _description_label:
+			nodo.offset_bottom = base[1] + extra # la descripción crece; su parte de arriba no se mueve
+		else:
+			nodo.offset_top = base[0] + extra
+			nodo.offset_bottom = base[1] + extra
+	if _is_expanded:
+		custom_minimum_size.y = EXPANDED_HEIGHT + _alto_extra
 
 
 # --- Botones ---

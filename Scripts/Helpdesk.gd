@@ -305,11 +305,12 @@ func _compose_detail(data: TicketData) -> String:
 		if lowered.contains(word):
 			is_incident = true
 			break
+	# El título ya se ve arriba en grande: aquí solo quién lo pide (o lo reporta).
 	var header := ""
 	if is_incident:
-		header = "%s - detectó un incidente: %s" % [data.solicitante, title]
+		header = "%s detectó un incidente" % data.solicitante
 	else:
-		header = "%s - solicita %s" % [data.solicitante, title]
+		header = "%s solicita este servicio" % data.solicitante
 	return header if data.detalle.is_empty() else header + "\n" + data.detalle
 
 
