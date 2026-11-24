@@ -64,6 +64,16 @@ signal ingreso_pasivo_cobrado(creditos: float, segundos: int) # cobro largo (p. 
 signal apagado_emergencia(evento: Dictionary, tickets_fallidos: int)
 ## Ticket entregado con el Data Center en advertencia: pagó menos (-25 %).
 signal ticket_recortado(titulo: String, creditos: float, recompensa_completa: float)
+## Incidente activo que manda el dashboard ({} = ninguno). Ver IncidenteAlerta.gd.
+signal incidente_actualizado(incidente: Dictionary)
+## Resultado al responder un incidente (o al vencerse sin respuesta).
+signal incidente_resultado(exito: bool, mensaje: String)
+## Falla eléctrica: el servidor apagó equipos (del último instalado al primero).
+## evento = {capacidad_watts, carga_antes, carga_despues, equipos: [...]}
+signal apagon_parcial(evento: Dictionary, tickets_fallidos: int)
+
+var incidente: Dictionary = {}       # incidente activo ({} = ninguno)
+var falla_electrica: bool = false    # true mientras un incidente FALLA_ELECTRICA reduce la energía
 
 var _dashboard_en_curso: bool = false
 var _tickets_en_curso: bool = false
@@ -119,6 +129,15 @@ func aplicar_estado(estado: Dictionary) -> void:
 	var aviso = m.get("warning", warning)
 	warning = "" if aviso == null else str(aviso)
 	racks = estado.get("racks", racks)
+	falla_electrica = bool(m.get("falla_electrica", falla_electrica))
+	if estado.has("incidente"):
+		var inc = estado["incidente"]
+		var nuevo: Dictionary = inc if inc is Dictionary else {}
+		if int(nuevo.get("id_incidente", 0)) != int(incidente.get("id_incidente", 0)) or nuevo.is_empty() != incidente.is_empty():
+			incidente = nuevo
+			incidente_actualizado.emit(incidente)
+		else:
+			incidente = nuevo # mismo incidente: solo se actualizan los segundos restantes
 	estado_recibido = true
 
 	creditos_actualizados.emit(creditos)
@@ -268,6 +287,8 @@ func _avisar_eventos(eventos) -> void:
 		return
 	var emergencia: Dictionary = {}
 	var fallidos := 0
+	var apagon: Dictionary = {}
+	var fallidos_apagon := 0
 	for ev in eventos:
 		if not ev is Dictionary:
 			continue
@@ -279,12 +300,38 @@ func _avisar_eventos(eventos) -> void:
 			"FALLIDO":
 				if str(ev.get("motivo", "")) == "OVERHEATED":
 					fallidos += 1
+				elif str(ev.get("motivo", "")) == "BROWNOUT":
+					fallidos_apagon += 1
+			"APAGON_PARCIAL":
+				apagon = ev
+			"INCIDENTE_FALLIDO":
+				if str(ev.get("motivo", "")) == "EXPIRADO":
+					incidente_resultado.emit(false, "No respondiste a tiempo \"%s\": %+d de reputación, -$%d." % [
+						str(ev.get("titulo", "")), int(ev.get("reputacion", 0)), absi(int(ev.get("creditos", 0)))])
 			"COMPLETADO":
 				if bool(ev.get("recorte_temperatura", false)):
 					ticket_recortado.emit(str(ev.get("titulo", "")), float(ev.get("creditos", 0)),
 						float(ev.get("recompensa_completa", 0)))
 	if not emergencia.is_empty():
 		apagado_emergencia.emit(emergencia, fallidos)
+	if not apagon.is_empty():
+		apagon_parcial.emit(apagon, fallidos_apagon)
+
+
+## POST /api/eventos/resolver: el servidor decide si la acción era la correcta.
+func resolver_incidente(id_incidente: int, accion: String) -> void:
+	_api(HTTPClient.METHOD_POST, "/api/eventos/resolver", {"id_incidente": id_incidente, "accion_ejecutada": accion}, func(codigo: int, json):
+		if codigo == 200 and json is Dictionary:
+			aplicar_estado(json.get("estado", {}))
+			incidente = {}
+			incidente_actualizado.emit(incidente)
+			incidente_resultado.emit(bool(json.get("exito", false)), str(json.get("mensaje", "")))
+			_avisar_eventos(json.get("eventos", []))
+			solicitar_dashboard()
+		else:
+			incidente_resultado.emit(false, _mensaje_error(codigo, json, "No se pudo responder el incidente."))
+			solicitar_dashboard()
+	)
 
 
 func es_game_over() -> bool:

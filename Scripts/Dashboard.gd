@@ -46,6 +46,7 @@ var _rack_nodes: Dictionary = {} # id_rack (int) -> instancia de Rack
 var _bar_labels: Dictionary = {} # ProgressBar -> Label con el valor y su unidad
 var _game_over_modal: GameOverModal = null
 var _globo_tickets: Label # cuántas solicitudes esperan respuesta
+var _incidente_alerta: IncidenteAlerta
 var _ingreso_label: Label # "+$X/min" junto a los créditos
 var _aviso_temp: Label    # aviso de thermal throttling debajo de la barra de temperatura
 var _color_temp_normal: Color
@@ -75,6 +76,11 @@ func _ready() -> void:
 	GameData.ingreso_pasivo_cobrado.connect(_on_ingreso_pasivo_cobrado)
 	GameData.apagado_emergencia.connect(_on_apagado_emergencia)
 	GameData.ticket_recortado.connect(_on_ticket_recortado)
+	GameData.apagon_parcial.connect(_on_apagon_parcial)
+	# Aviso de incidentes (arriba al centro). El modal de Game Over, si aparece,
+	# se agrega después y queda encima.
+	_incidente_alerta = IncidenteAlerta.new()
+	add_child(_incidente_alerta)
 
 	_rack_container.alignment = BoxContainer.ALIGNMENT_CENTER
 	_rack_container.add_theme_constant_override("separation", 35)
@@ -197,6 +203,21 @@ func _on_apagado_emergencia(evento: Dictionary, tickets_fallidos: int) -> void:
 	_mostrar_aviso_flotante(texto, COLOR_AVISO_EMERGENCIA, SEGUNDOS_AVISO_EMERGENCIA)
 
 
+## Falla eléctrica: el servidor apagó equipos del último instalado al primero.
+func _on_apagon_parcial(evento: Dictionary, tickets_fallidos: int) -> void:
+	var nombres: Array[String] = []
+	for equipo in evento.get("equipos", []):
+		if equipo is Dictionary:
+			nombres.append(str(equipo.get("nombreProducto", "equipo")))
+	var texto := "¡APAGÓN PARCIAL! La energía bajó a %d W y el consumo era de %d W.
+Se apagó: %s" % [
+		roundi(float(evento.get("capacidad_watts", 0))), roundi(float(evento.get("carga_antes", 0))), ", ".join(nombres)]
+	if tickets_fallidos > 0:
+		texto += "
+%d ticket(s) en proceso fallaron por falta de capacidad." % tickets_fallidos
+	_mostrar_aviso_flotante(texto, COLOR_AVISO_EMERGENCIA, SEGUNDOS_AVISO_EMERGENCIA)
+
+
 ## Ticket entregado en zona de advertencia: el servidor pagó 25 % menos.
 func _on_ticket_recortado(titulo: String, creditos: float, recompensa_completa: float) -> void:
 	var recorte := 0
@@ -294,7 +315,8 @@ func _aplicar_estado() -> void:
 	_pintar_barra(_temp_bar, GameData.temperatura, TEMPERATURA_ESCALA,
 		"%d °C" % roundi(GameData.temperatura))
 	_pintar_barra(_watts_bar, GameData.carga_electrica, GameData.capacidad_watts,
-		"%d / %d W" % [roundi(GameData.carga_electrica), roundi(GameData.capacidad_watts)])
+		"%d / %d W%s" % [roundi(GameData.carga_electrica), roundi(GameData.capacidad_watts),
+			"  ⚡ FALLA ELÉCTRICA" if GameData.falla_electrica else ""])
 	# RAM y TFLOPS: lo que apartan los tickets en proceso sobre el total instalado.
 	var ram_uso := float(GameData.reservado.get("memoria", 0))
 	var tf_uso := float(GameData.reservado.get("teraflops", 0))

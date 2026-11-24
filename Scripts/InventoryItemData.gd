@@ -18,6 +18,7 @@ class_name InventoryItemData
 
 @export var activo: bool = true          # Inventario_Usuario.encendido
 @export var sobrecalentado: bool = false # motivo_apagado == "OVERHEATED" (apagado de emergencia)
+@export var sin_energia: bool = false    # motivo_apagado == "BROWNOUT" (apagón parcial)
 @export var rack_numero: int = 0
 @export var slot_inicio: int = 0
 @export var precio_venta: float = 0.0    # lo que devuelve el servidor al vender
@@ -36,6 +37,7 @@ static func desde_json(fila: Dictionary) -> InventoryItemData:
 	data.consumo_electrico = int(fila.get("consumoElectrico", 0))
 	data.activo = bool(fila.get("encendido", true))
 	data.sobrecalentado = str(fila.get("motivo_apagado", "")) == "OVERHEATED"
+	data.sin_energia = str(fila.get("motivo_apagado", "")) == "BROWNOUT"
 	var rack = fila.get("rack_numero")
 	data.rack_numero = int(rack) if rack != null else 0
 	var slot = fila.get("slot_inicio")
