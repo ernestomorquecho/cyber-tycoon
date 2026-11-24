@@ -14,6 +14,7 @@ const COLOR_ALERT := Color(1, 0.11764706, 0.11764706)
 const COLOR_ALERT_DIM := Color(0.3, 0, 0)
 const COLOR_OFF := Color(0.35, 0.35, 0.38)
 const COLOR_OVERHEATED := Color(0.5, 0.08, 0.05) # apagado por el apagado de emergencia
+const COLOR_SIN_ENERGIA := Color(0.55, 0.38, 0.05) # apagado por el apagón parcial
 const COLOR_EMPTY := Color(0.15, 0.15, 0.15)
 
 # Tamaño de cada franja: 14 franjas deben caber dentro del marco de rack.png.
@@ -71,6 +72,8 @@ func _rebuild_slots() -> void:
 			estado = "on"
 		elif bool(equipo.get("sobrecalentado", false)):
 			estado = "hot"
+		elif bool(equipo.get("sin_energia", false)):
+			estado = "brownout"
 		for i in int(equipo.get("espacio", 1)):
 			ocupacion[inicio + i] = estado
 
@@ -86,6 +89,8 @@ func _rebuild_slots() -> void:
 				_leds_encendidos.append(led)
 			"hot":
 				led.color = COLOR_OVERHEATED
+			"brownout":
+				led.color = COLOR_SIN_ENERGIA
 			_:
 				led.color = COLOR_OFF
 		_slots_grid.add_child(led)

@@ -95,6 +95,10 @@ func _update_visual_state(activo: bool) -> void:
 	elif sobrecalentado:
 		modulate = Color(1, 0.45, 0.45, 1)
 		_toggle_button.text = "SOBRECALENTADO"
+	elif _data != null and _data.sin_energia:
+		# Lo apagó el apagón parcial (falla eléctrica): tono ámbar.
+		modulate = Color(1, 0.8, 0.4, 1)
+		_toggle_button.text = "SIN ENERGÍA"
 	else:
 		modulate = Color(0.5, 0.5, 0.5, 1)
 		_toggle_button.text = "Apagado"
@@ -105,6 +109,9 @@ func _tooltip() -> String:
 	if _data == null:
 		return ""
 	var texto := "Rack %d, U %d" % [_data.rack_numero, _data.slot_inicio + 1] if _data.rack_numero > 0 else ""
+	if not _data.activo and _data.sin_energia:
+		texto += "
+Apagado por el apagón parcial (falla eléctrica). Reenciéndelo cuando vuelva la energía."
 	if not _data.activo and _data.sobrecalentado:
 		texto += "\nApagado de emergencia por temperatura. Mejora la refrigeración para reencenderlo."
 	return texto.strip_edges()
@@ -132,6 +139,7 @@ func _on_equipo_cambiado(id_inventario: int, exito: bool, encendido: bool, texto
 	# Si el servidor dijo que no (p. ej. INSUFFICIENT_POWER), el interruptor regresa.
 	if exito:
 		_data.sobrecalentado = false # el jugador lo cambió: se borra la marca
+		_data.sin_energia = false
 	_data.activo = encendido
 	_toggle_button.set_pressed_no_signal(encendido)
 	_update_visual_state(encendido)
