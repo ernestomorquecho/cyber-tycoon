@@ -11,6 +11,13 @@ const CatalogoScene: PackedScene = preload("res://Escenas/Catalogo.tscn")
 const TicketsScene: PackedScene = preload("res://Escenas/Tickets.tscn")
 const InventarioScene: PackedScene = preload("res://Escenas/Inventario.tscn")
 const RackScene: PackedScene = preload("res://Escenas/Dashboard/Rack.tscn")
+const ICONO_DINERO: Texture2D = preload("res://Assets/Tickets/money.png")
+const ICONO_REPUTACION: Texture2D = preload("res://Assets/Tickets/repu.png")
+const ICONO_MUSICA_ON: Texture2D = preload("res://Assets/Dashboard/musicaon.png")
+const ICONO_MUSICA_OFF: Texture2D = preload("res://Assets/Dashboard/musicaoff.png")
+const ICONO_ACERCA_DE: Texture2D = preload("res://Assets/Dashboard/Acerca_de.png")
+const TAMANO_ICONO_BARRA := Vector2(30, 30)  # dinero / reputación en la barra superior (50 px de alto)
+const TAMANO_BOTON_MUSICA := Vector2(44, 44)
 
 const POLL_INTERVAL_SECONDS := 5.0
 const TEMPERATURA_ESCALA := 100.0 # tope visual de la barra de temperatura
@@ -49,6 +56,8 @@ var _globo_tickets: Label # cuántas solicitudes esperan respuesta
 var _incidente_alerta: IncidenteAlerta
 var _ingreso_label: Label # "+$X/min" junto a los créditos
 var _aviso_temp: Label    # aviso de thermal throttling debajo de la barra de temperatura
+var _reputacion_label: Label # valor de reputación junto a su ícono (repu.png)
+var _acerca_de: AcercaDe     # pantalla "Acerca de" (se crea al abrirla)
 var _color_temp_normal: Color
 
 
@@ -85,7 +94,9 @@ func _ready() -> void:
 	_rack_container.alignment = BoxContainer.ALIGNMENT_CENTER
 	_rack_container.add_theme_constant_override("separation", 35)
 
-	_credits_label.text = "Créditos: ..."
+	_crear_iconos_barra_superior()
+	_crear_boton_acerca_de()
+	_credits_label.text = "..."
 	_poll_timer.wait_time = POLL_INTERVAL_SECONDS
 	_poll_timer.timeout.connect(GameData.solicitar_dashboard)
 	_poll_timer.start()
@@ -134,8 +145,13 @@ func _crear_globo_tickets() -> void:
 	fondo.bg_color = Color(0.9, 0.15, 0.2)
 	fondo.set_corner_radius_all(17)
 	_globo_tickets.add_theme_stylebox_override("normal", fondo)
-	_globo_tickets.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	_globo_tickets.position += Vector2(-6, 4)
+	# Esquina superior derecha DENTRO del botón: el botón está pegado al borde
+	# derecho de la pantalla y un globo que crece hacia afuera se cortaba.
+	_globo_tickets.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	_globo_tickets.offset_left = -40
+	_globo_tickets.offset_right = -6
+	_globo_tickets.offset_top = 6
+	_globo_tickets.offset_bottom = 40
 	_globo_tickets.visible = false
 	_tickets_button.add_child(_globo_tickets)
 
@@ -305,8 +321,8 @@ func _pintar_barra(bar: ProgressBar, valor: float, maximo: float, texto: String)
 
 
 func _aplicar_estado() -> void:
-	_credits_label.text = "Créditos: $%s     Reputación: %d/100" % [
-		_formato_miles(GameData.creditos), GameData.reputacion]
+	_credits_label.text = "$%s" % _formato_miles(GameData.creditos)
+	_reputacion_label.text = "%d/100" % GameData.reputacion
 	_actualizar_game_over()
 	_actualizar_ingresos()
 	_globo_tickets.text = str(GameData.tickets_pendientes)
@@ -372,6 +388,83 @@ func _on_boton_silencio_pressed() -> void:
 	_actualizar_texto_silencio()
 
 
+## El botón de música (Button de Dashboard.tscn) muestra musicaon.png / musicaoff.png.
 func _actualizar_texto_silencio() -> void:
 	if boton_silencio:
-		boton_silencio.text = "MUSICA: OFF" if MusicaFondo.stream_paused else "MUSICA: ON" 
+		var pausada: bool = MusicaFondo.stream_paused
+		boton_silencio.icon = ICONO_MUSICA_OFF if pausada else ICONO_MUSICA_ON
+		boton_silencio.tooltip_text = "Activar música" if pausada else "Silenciar música"
+
+
+# --- Barra superior: íconos en lugar de los textos "Créditos" / "Reputación" ---
+
+## [ícono dinero] $1,000  +$8/min   [ícono reputación] 50/100
+## El ingreso por minuto (_ingreso_label) ya va justo después de los créditos.
+func _crear_iconos_barra_superior() -> void:
+	var barra := _credits_label.get_parent()
+	barra.add_theme_constant_override("separation", 8)
+
+	var icono_dinero := _crear_icono_barra(ICONO_DINERO, "Créditos")
+	barra.add_child(icono_dinero)
+	barra.move_child(icono_dinero, _credits_label.get_index())
+	_credits_label.tooltip_text = "Créditos"
+	_credits_label.mouse_filter = Control.MOUSE_FILTER_PASS
+
+	var separador := Control.new()
+	separador.custom_minimum_size.x = 18
+	barra.add_child(separador)
+	barra.add_child(_crear_icono_barra(ICONO_REPUTACION, "Reputación (0-100)"))
+	_reputacion_label = Label.new()
+	_reputacion_label.text = "..."
+	_reputacion_label.tooltip_text = "Reputación (0-100)"
+	_reputacion_label.mouse_filter = Control.MOUSE_FILTER_PASS
+	barra.add_child(_reputacion_label)
+	var margen := Control.new()
+	margen.custom_minimum_size.x = 12
+	barra.add_child(margen)
+
+	# Botón de música: solo ícono (sin texto), del tamaño del botón.
+	if boton_silencio:
+		boton_silencio.text = ""
+		boton_silencio.flat = true
+		boton_silencio.expand_icon = true
+		boton_silencio.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		boton_silencio.custom_minimum_size = TAMANO_BOTON_MUSICA
+		boton_silencio.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		boton_silencio.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+
+
+func _crear_icono_barra(textura: Texture2D, ayuda: String) -> TextureRect:
+	var icono := TextureRect.new()
+	icono.texture = textura
+	icono.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	icono.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	icono.custom_minimum_size = TAMANO_ICONO_BARRA
+	icono.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	icono.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST # pixel art nítido
+	icono.tooltip_text = ayuda
+	return icono
+
+
+# --- Botón y pantalla "Acerca de" ---
+
+## Botón con Acerca_de.png debajo de Inventario y Salir (columna izquierda).
+func _crear_boton_acerca_de() -> void:
+	var boton := TextureButton.new()
+	boton.texture_normal = ICONO_ACERCA_DE
+	boton.ignore_texture_size = true
+	boton.stretch_mode = TextureButton.STRETCH_KEEP_ASPECT_CENTERED
+	boton.custom_minimum_size = Vector2(100, 100)
+	boton.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
+	boton.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	boton.tooltip_text = "Acerca de: cómo funciona el juego"
+	boton.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	boton.pressed.connect(_abrir_acerca_de)
+	_salir_button.get_parent().add_child(boton)
+
+
+func _abrir_acerca_de() -> void:
+	if _acerca_de != null and is_instance_valid(_acerca_de):
+		return
+	_acerca_de = AcercaDe.new()
+	add_child(_acerca_de) # encima del Dashboard; el modal de Game Over, si aparece, va después
