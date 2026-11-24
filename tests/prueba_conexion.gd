@@ -111,7 +111,7 @@ func _correr() -> void:
 	r = await _req(HTTPClient.METHOD_POST, "/api/profesor/clases/%d/estudiantes" % id_clase, {"nombreUsuario": alumno}, token_prof)
 	_paso("POST /api/profesor/clases/:id/estudiantes", r, 201)
 
-	# 6. Login del jugador (igual que login.gd)
+	# 6. Login del jugador (igual que login/Login.gd)
 	r = await _req(HTTPClient.METHOD_POST, "/api/auth/login", {"nombreUsuario": alumno, "codigo_clase": codigo})
 	if not _paso("POST /api/auth/login (jugador)", r) or not r.datos is Dictionary:
 		_fin()

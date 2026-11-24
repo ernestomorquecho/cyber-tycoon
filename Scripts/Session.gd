@@ -1,7 +1,7 @@
 extends RefCounted
 class_name Session
 ## Punto único donde vive el token del jugador autenticado.
-## login.gd escribe aquí el token de POST /api/auth/login (GameData.token_jwt
+## login/Login.gd escribe aquí el token de POST /api/auth/login (GameData.token_jwt
 ## solo reenvía a esta variable). Si jwt_token está vacío (escena corrida suelta
 ## sin login), Helpdesk.gd y TicketCard.gd caen a modo simulación.
 
